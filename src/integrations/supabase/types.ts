@@ -71,6 +71,10 @@ export type Database = {
           status: Database["public"]["Enums"]["spec_status"]
           updated_at: string
           user_id: string
+          api_version: string | null
+          openapi_version: string | null
+          auth_type: string | null
+          servers: Json
         }
         Insert: {
           api_version?: string | null
@@ -87,6 +91,10 @@ export type Database = {
           status?: Database["public"]["Enums"]["spec_status"]
           updated_at?: string
           user_id: string
+          api_version?: string | null
+          openapi_version?: string | null
+          auth_type?: string | null
+          servers?: Json
         }
         Update: {
           api_version?: string | null
@@ -103,40 +111,91 @@ export type Database = {
           status?: Database["public"]["Enums"]["spec_status"]
           updated_at?: string
           user_id?: string
+          api_version?: string | null
+          openapi_version?: string | null
+          auth_type?: string | null
+          servers?: Json
         }
         Relationships: []
       }
       generated_docs: {
         Row: {
-          authentication: string | null
-          endpoints: Json
-          generated_at: string
           id: string
-          markdown: string | null
-          overview: string | null
           spec_id: string
+          overview: string | null
+          auth_guide: string | null
+          quick_start: string | null
+          best_practices: string | null
+          full_markdown: string | null
+          created_at: string
+          updated_at: string
         }
         Insert: {
-          authentication?: string | null
-          endpoints?: Json
-          generated_at?: string
           id?: string
-          markdown?: string | null
-          overview?: string | null
           spec_id: string
+          overview?: string | null
+          auth_guide?: string | null
+          quick_start?: string | null
+          best_practices?: string | null
+          full_markdown?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Update: {
-          authentication?: string | null
-          endpoints?: Json
-          generated_at?: string
           id?: string
-          markdown?: string | null
-          overview?: string | null
           spec_id?: string
+          overview?: string | null
+          auth_guide?: string | null
+          quick_start?: string | null
+          best_practices?: string | null
+          full_markdown?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Relationships: [
           {
             foreignKeyName: "generated_docs_spec_id_fkey"
+            columns: ["spec_id"]
+            isOneToOne: false
+            referencedRelation: "api_specs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_endpoints: {
+        Row: {
+          id: string
+          spec_id: string
+          method: string
+          path: string
+          summary: string | null
+          tags: string[]
+          operation_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          spec_id: string
+          method: string
+          path: string
+          summary?: string | null
+          tags?: string[]
+          operation_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          spec_id?: string
+          method?: string
+          path?: string
+          summary?: string | null
+          tags?: string[]
+          operation_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_endpoints_spec_id_fkey"
             columns: ["spec_id"]
             isOneToOne: false
             referencedRelation: "api_specs"

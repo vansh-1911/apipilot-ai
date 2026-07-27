@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ValidatedSpec } from "@/lib/api-spec-validator";
 import { parseOpenApiSpec } from "./openapi-parser";
+import { generateDocumentation } from "./ai-document-generator";
 
 export interface UploadResult {
   success: boolean;
@@ -123,6 +124,18 @@ async function parseAndStoreMetadata(specId: string, file: File) {
         .insert(endpointsToInsert);
 
       if (endpointsError) throw endpointsError;
+    }
+
+    // 4. Trigger AI Documentation Generation
+    await supabase.from("api_specs").update({ status: "processing" }).eq("id", specId); // Re-confirm processing status
+    
+    const aiResult = await generateDocumentation(specId);
+    
+    if (aiResult.success) {
+      await supabase.from("api_specs").update({ status: "completed" }).eq("id", specId);
+    } else {
+      console.error("AI Generation failed:", aiResult.error);
+      await supabase.from("api_specs").update({ status: "failed" }).eq("id", specId);
     }
 
   } catch (error) {

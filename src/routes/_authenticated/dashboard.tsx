@@ -232,7 +232,8 @@ function SpecList({ specs }: { specs: ApiSpec[] }) {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <p className="font-medium truncate">{s.name}</p>
-                <span className={`text-[10px] uppercase tracking-wider font-semibold border rounded px-1.5 py-0.5 ${statusStyles[s.status]}`}>
+                <span className={`text-[10px] uppercase tracking-wider font-semibold border rounded px-1.5 py-0.5 flex items-center gap-1 ${statusStyles[s.status]}`}>
+                  {s.status === "processing" && <Loader2 className="h-2 w-2 animate-spin" />}
                   {s.status}
                 </span>
                 {s.api_version && (
