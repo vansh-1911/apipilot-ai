@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   LayoutDashboard,
   Boxes,
@@ -20,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { formatDistanceToNow } from "date-fns";
+import { UploadModal } from "@/components/upload-modal";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -57,6 +59,7 @@ type ApiSpec = {
 function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   const {
     data: specs,
@@ -153,7 +156,10 @@ function Dashboard() {
               <p className="text-sm text-muted-foreground">Welcome back</p>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Your API specifications</h1>
             </div>
-            <Button className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow">
+            <Button 
+              className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow"
+              onClick={() => setUploadModalOpen(true)}
+            >
               <Upload className="mr-2 h-4 w-4" />
               Upload API Specification
             </Button>
@@ -168,17 +174,22 @@ function Dashboard() {
               Couldn't load your specifications: {(error as Error).message}
             </div>
           ) : !specs || specs.length === 0 ? (
-            <EmptyState />
+            <EmptyState onUploadClick={() => setUploadModalOpen(true)} />
           ) : (
             <SpecList specs={specs} />
           )}
         </main>
       </div>
+
+      <UploadModal 
+        open={uploadModalOpen} 
+        onOpenChange={setUploadModalOpen} 
+      />
     </div>
   );
 }
 
-function EmptyState() {
+function EmptyState({ onUploadClick }: { onUploadClick: () => void }) {
   return (
     <div className="rounded-xl border border-dashed border-border bg-card/40 p-12 text-center">
       <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-brand shadow-glow">
@@ -188,7 +199,10 @@ function EmptyState() {
       <p className="mt-1 text-sm text-muted-foreground">
         Upload an OpenAPI or Swagger file to get started.
       </p>
-      <Button className="mt-6 bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow">
+      <Button 
+        className="mt-6 bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow"
+        onClick={onUploadClick}
+      >
         <Upload className="mr-2 h-4 w-4" />
         Upload API Specification
       </Button>
