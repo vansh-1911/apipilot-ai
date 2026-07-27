@@ -1,4 +1,5 @@
 import SwaggerParser from "@apidevtools/swagger-parser";
+import * as yaml from "js-yaml";
 import { OpenAPI } from "openapi-types";
 
 export interface ParsedMetadata {
@@ -22,8 +23,30 @@ export interface ParsedEndpoint {
 
 export async function parseOpenApiSpec(fileContent: string | object): Promise<ParsedMetadata> {
   try {
-    // 1. Parse and Validate the spec
-    const api = await SwaggerParser.validate(fileContent as any);
+    let parsedObject: any;
+
+    if (typeof fileContent === "string") {
+      const trimmed = fileContent.trim();
+      if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        try {
+          parsedObject = JSON.parse(trimmed);
+        } catch (e) {
+          // If JSON parse fails, try YAML
+          parsedObject = yaml.load(trimmed);
+        }
+      } else {
+        parsedObject = yaml.load(trimmed);
+      }
+    } else {
+      parsedObject = fileContent;
+    }
+
+    if (!parsedObject || typeof parsedObject !== "object") {
+      throw new Error("Invalid specification format: Could not parse as JSON or YAML.");
+    }
+
+    // 1. Validate the spec object
+    const api = await SwaggerParser.validate(parsedObject);
 
     // 2. Extract basic info
     const title = api.info.title || "Untitled API";
