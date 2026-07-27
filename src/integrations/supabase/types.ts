@@ -14,7 +14,107 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      api_specs: {
+        Row: {
+          created_at: string
+          description: string | null
+          endpoint_count: number
+          file_name: string
+          file_path: string
+          id: string
+          name: string
+          status: Database["public"]["Enums"]["spec_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          endpoint_count?: number
+          file_name: string
+          file_path: string
+          id?: string
+          name: string
+          status?: Database["public"]["Enums"]["spec_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          endpoint_count?: number
+          file_name?: string
+          file_path?: string
+          id?: string
+          name?: string
+          status?: Database["public"]["Enums"]["spec_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      generated_docs: {
+        Row: {
+          authentication: string | null
+          endpoints: Json
+          generated_at: string
+          id: string
+          markdown: string | null
+          overview: string | null
+          spec_id: string
+        }
+        Insert: {
+          authentication?: string | null
+          endpoints?: Json
+          generated_at?: string
+          id?: string
+          markdown?: string | null
+          overview?: string | null
+          spec_id: string
+        }
+        Update: {
+          authentication?: string | null
+          endpoints?: Json
+          generated_at?: string
+          id?: string
+          markdown?: string | null
+          overview?: string | null
+          spec_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_docs_spec_id_fkey"
+            columns: ["spec_id"]
+            isOneToOne: false
+            referencedRelation: "api_specs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +123,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      spec_status: "uploaded" | "processing" | "completed" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +250,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      spec_status: ["uploaded", "processing", "completed", "failed"],
+    },
   },
 } as const
