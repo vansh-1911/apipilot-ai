@@ -52,6 +52,9 @@ type ApiSpec = {
   file_name: string;
   status: "uploaded" | "processing" | "completed" | "failed";
   endpoint_count: number;
+  api_version: string | null;
+  openapi_version: string | null;
+  auth_type: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -72,7 +75,7 @@ function Dashboard() {
     queryFn: async (): Promise<ApiSpec[]> => {
       const { data, error } = await supabase
         .from("api_specs")
-        .select("id, name, description, file_name, status, endpoint_count, created_at, updated_at")
+        .select("id, name, description, file_name, status, endpoint_count, api_version, openapi_version, auth_type, created_at, updated_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -232,11 +235,21 @@ function SpecList({ specs }: { specs: ApiSpec[] }) {
                 <span className={`text-[10px] uppercase tracking-wider font-semibold border rounded px-1.5 py-0.5 ${statusStyles[s.status]}`}>
                   {s.status}
                 </span>
+                {s.api_version && (
+                  <span className="text-[10px] text-muted-foreground font-mono">v{s.api_version}</span>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground truncate mt-0.5 font-mono">{s.file_name}</p>
+              <div className="flex items-center gap-3 mt-0.5">
+                <p className="text-xs text-muted-foreground truncate font-mono">{s.file_name}</p>
+                {s.auth_type && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/50 text-muted-foreground">
+                    {s.auth_type}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="text-right hidden sm:block">
-              <p className="text-sm">{s.endpoint_count} endpoints</p>
+              <p className="text-sm font-semibold">{s.endpoint_count} endpoints</p>
               <p className="text-xs text-muted-foreground">
                 {formatDistanceToNow(new Date(s.updated_at), { addSuffix: true })}
               </p>

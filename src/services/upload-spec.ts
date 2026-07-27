@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ValidatedSpec } from "@/lib/api-spec-validator";
+import { parseOpenApiSpec } from "./openapi-parser";
 
 export interface UploadResult {
   success: boolean;
@@ -65,9 +66,67 @@ export async function uploadApiSpec(
       return { success: false, error: `Failed to save specification: ${dbError.message}` };
     }
 
-    return { success: true, specId: specData.id };
+    // 4. Trigger Parsing (Client-side for now as per Prompt 3 requirements)
+    const specId = specData.id;
+    
+    // We do this asynchronously to not block the UI response, but the dashboard will see the status change
+    parseAndStoreMetadata(specId, file).catch(err => {
+      console.error("Async parsing failed:", err);
+    });
+
+    return { success: true, specId };
   } catch (error: any) {
     console.error("Unexpected upload error:", error);
     return { success: false, error: error.message || "An unexpected error occurred during upload." };
+  }
+}
+
+async function parseAndStoreMetadata(specId: string, file: File) {
+  try {
+    // Update status to processing
+    await supabase.from("api_specs").update({ status: "processing" }).eq("id", specId);
+
+    // Read and parse file
+    const text = await file.text();
+    const metadata = await parseOpenApiSpec(text);
+
+    // Update api_specs with metadata
+    const { error: updateError } = await supabase
+      .from("api_specs")
+      .update({
+        name: metadata.title,
+        description: metadata.description,
+        api_version: metadata.apiVersion,
+        openapi_version: metadata.openapiVersion,
+        auth_type: metadata.authType,
+        servers: metadata.servers,
+        endpoint_count: metadata.endpointCount,
+        status: "completed",
+      })
+      .eq("id", specId);
+
+    if (updateError) throw updateError;
+
+    // Insert endpoints
+    if (metadata.endpoints.length > 0) {
+      const endpointsToInsert = metadata.endpoints.map(ep => ({
+        spec_id: specId,
+        method: ep.method,
+        path: ep.path,
+        summary: ep.summary,
+        tags: ep.tags,
+        operation_id: ep.operationId,
+      }));
+
+      const { error: endpointsError } = await supabase
+        .from("api_endpoints")
+        .insert(endpointsToInsert);
+
+      if (endpointsError) throw endpointsError;
+    }
+
+  } catch (error) {
+    console.error("Parsing and storage failed:", error);
+    await supabase.from("api_specs").update({ status: "failed" }).eq("id", specId);
   }
 }
