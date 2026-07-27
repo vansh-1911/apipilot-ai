@@ -93,20 +93,16 @@ function validateSpecStructure(spec: any): void {
   if (!isOpenApi3 && !isSwagger2) {
     throw new Error(
       "Invalid specification: Missing or unrecognized 'openapi' or 'swagger' version field. " +
-      "Expected OpenAPI 3.x.x or Swagger 2.x."
+        "Expected OpenAPI 3.x.x or Swagger 2.x.",
     );
   }
 
   if (!spec.info || typeof spec.info !== "object") {
-    throw new Error(
-      "Invalid specification: Missing required 'info' object."
-    );
+    throw new Error("Invalid specification: Missing required 'info' object.");
   }
 
   if (!spec.info.title || typeof spec.info.title !== "string") {
-    throw new Error(
-      "Invalid specification: Missing required 'info.title' field."
-    );
+    throw new Error("Invalid specification: Missing required 'info.title' field.");
   }
 
   if (!spec.paths || typeof spec.paths !== "object") {
@@ -122,16 +118,13 @@ function validateSpecStructure(spec: any): void {
 function extractServers(spec: any): string[] {
   // OpenAPI 3.x uses a `servers` array
   if (Array.isArray(spec.servers) && spec.servers.length > 0) {
-    return spec.servers
-      .map((s: any) => (typeof s === "string" ? s : s?.url))
-      .filter(Boolean);
+    return spec.servers.map((s: any) => (typeof s === "string" ? s : s?.url)).filter(Boolean);
   }
 
   // Swagger 2.x uses host + basePath + schemes
   if (spec.host) {
-    const scheme = Array.isArray(spec.schemes) && spec.schemes.length > 0
-      ? spec.schemes[0]
-      : "https";
+    const scheme =
+      Array.isArray(spec.schemes) && spec.schemes.length > 0 ? spec.schemes[0] : "https";
     const basePath = spec.basePath || "";
     return [`${scheme}://${spec.host}${basePath}`];
   }
