@@ -14,8 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_endpoints: {
+        Row: {
+          id: string
+          spec_id: string
+          method: string
+          path: string
+          summary: string | null
+          tags: string[]
+          operation_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          spec_id: string
+          method: string
+          path: string
+          summary?: string | null
+          tags?: string[]
+          operation_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          spec_id?: string
+          method?: string
+          path?: string
+          summary?: string | null
+          tags?: string[]
+          operation_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_endpoints_spec_id_fkey"
+            columns: ["spec_id"]
+            isOneToOne: false
+            referencedRelation: "api_specs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       api_specs: {
         Row: {
+          api_version: string | null
+          auth_type: string | null
           created_at: string
           description: string | null
           endpoint_count: number
@@ -23,11 +66,15 @@ export type Database = {
           file_path: string
           id: string
           name: string
+          openapi_version: string | null
+          servers: string[] | null
           status: Database["public"]["Enums"]["spec_status"]
           updated_at: string
           user_id: string
         }
         Insert: {
+          api_version?: string | null
+          auth_type?: string | null
           created_at?: string
           description?: string | null
           endpoint_count?: number
@@ -35,11 +82,15 @@ export type Database = {
           file_path: string
           id?: string
           name: string
+          openapi_version?: string | null
+          servers?: string[] | null
           status?: Database["public"]["Enums"]["spec_status"]
           updated_at?: string
           user_id: string
         }
         Update: {
+          api_version?: string | null
+          auth_type?: string | null
           created_at?: string
           description?: string | null
           endpoint_count?: number
@@ -47,6 +98,8 @@ export type Database = {
           file_path?: string
           id?: string
           name?: string
+          openapi_version?: string | null
+          servers?: string[] | null
           status?: Database["public"]["Enums"]["spec_status"]
           updated_at?: string
           user_id?: string
