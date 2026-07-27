@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Menu, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 
 const nav = [
   { label: "Features", href: "/#features" },
@@ -12,6 +13,7 @@ const nav = [
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const { session } = useAuth();
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/60 glass">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
@@ -37,14 +39,24 @@ export function SiteHeader() {
         </nav>
 
         <div className="hidden md:flex items-center gap-2">
-          <Link to="/dashboard">
-            <Button variant="ghost" size="sm">Sign in</Button>
-          </Link>
-          <Link to="/dashboard">
-            <Button size="sm" className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow">
-              Get started
-            </Button>
-          </Link>
+          {session ? (
+            <Link to="/dashboard">
+              <Button size="sm" className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow">
+                Open dashboard
+              </Button>
+            </Link>
+          ) : (
+            <>
+              <Link to="/auth">
+                <Button variant="ghost" size="sm">Sign in</Button>
+              </Link>
+              <Link to="/auth">
+                <Button size="sm" className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow">
+                  Get started
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
 
         <button
@@ -63,8 +75,10 @@ export function SiteHeader() {
               {n.label}
             </a>
           ))}
-          <Link to="/dashboard" className="block">
-            <Button className="w-full bg-gradient-brand text-primary-foreground">Get started</Button>
+          <Link to={session ? "/dashboard" : "/auth"} className="block">
+            <Button className="w-full bg-gradient-brand text-primary-foreground">
+              {session ? "Open dashboard" : "Get started"}
+            </Button>
           </Link>
         </div>
       )}
