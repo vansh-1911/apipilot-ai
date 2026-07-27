@@ -12,6 +12,10 @@ import { UploadDropzone } from "./upload-dropzone";
 import { FilePreview } from "./file-preview";
 import { validateApiSpec, ValidatedSpec, ValidationError } from "@/lib/api-spec-validator";
 import { toast } from "sonner";
+import { uploadApiSpec } from "@/services/upload-spec";
+import { useAuth } from "@/hooks/use-auth";
+import { useQueryClient } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 
 interface UploadModalProps {
   open: boolean;
@@ -27,9 +31,12 @@ const ERROR_MESSAGES: Record<ValidationError, string> = {
 };
 
 export function UploadModal({ open, onOpenChange }: UploadModalProps) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [validatedData, setValidatedData] = useState<ValidatedSpec | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleFileSelect = async (selectedFile: File) => {
@@ -59,9 +66,20 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
     setError(null);
   };
 
-  const handleContinue = () => {
-    toast.info("Upload functionality coming soon in Prompt 2B!");
-    onOpenChange(false);
+  const handleContinue = async () => {
+    if (!file || !validatedData || !user) return;
+
+    setIsUploading(true);
+    const result = await uploadApiSpec(file, validatedData, user.id);
+    setIsUploading(false);
+
+    if (result.success) {
+      toast.success("Specification uploaded successfully!");
+      queryClient.invalidateQueries({ queryKey: ["api_specs"] });
+      onOpenChange(false);
+    } else {
+      toast.error(result.error || "Failed to upload specification.");
+    }
   };
 
   const resetAndClose = (newOpen: boolean) => {
@@ -103,15 +121,22 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="ghost" onClick={() => resetAndClose(false)}>
+          <Button variant="ghost" onClick={() => resetAndClose(false)} disabled={isUploading}>
             Cancel
           </Button>
           <Button 
-            className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow"
-            disabled={!validatedData}
+            className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow min-w-[100px]"
+            disabled={!validatedData || isUploading}
             onClick={handleContinue}
           >
-            Continue
+            {isUploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              "Continue"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

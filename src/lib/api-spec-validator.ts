@@ -5,6 +5,7 @@ export interface ValidatedSpec {
   fileSize: number;
   fileType: "json" | "yaml";
   apiTitle?: string;
+  apiDescription?: string;
   apiVersion?: string;
   detectedVersion: string;
 }
@@ -60,6 +61,7 @@ export async function validateApiSpec(file: File): Promise<{ data?: ValidatedSpe
 
     const detectedVersion = openapiVersion ? `OpenAPI ${openapiVersion}` : `Swagger ${swaggerVersion}`;
     const apiTitle = parsed.info?.title;
+    const apiDescription = parsed.info?.description;
     const apiVersion = parsed.info?.version;
 
     return {
@@ -68,6 +70,7 @@ export async function validateApiSpec(file: File): Promise<{ data?: ValidatedSpe
         fileSize: file.size,
         fileType,
         apiTitle,
+        apiDescription,
         apiVersion,
         detectedVersion,
       },
