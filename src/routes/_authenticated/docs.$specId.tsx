@@ -145,7 +145,7 @@ function DocsPage() {
     }
   };
 
-  const fullMarkdown = data?.doc?.full_markdown ?? buildFallbackMarkdown(data?.doc, data?.spec);
+  const fullMarkdown = data?.doc?.full_markdown ?? buildFallbackMarkdown(data?.doc ?? null, data?.spec);
 
   const copyMarkdown = async () => {
     if (!fullMarkdown) return;
