@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   LayoutDashboard,
   Boxes,
@@ -15,6 +15,16 @@ import {
   Loader2,
   LogOut,
   Activity,
+  Calendar,
+  Shield,
+  Hash,
+  ArrowUpDown,
+  ExternalLink,
+  MoreVertical,
+  Clock,
+  RefreshCw,
+  Check,
+  AlertTriangle as AlertTriangleIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +32,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { formatDistanceToNow } from "date-fns";
 import { UploadModal } from "@/components/upload-modal";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -59,10 +84,14 @@ type ApiSpec = {
   updated_at: string;
 };
 
+type SortOption = "newest" | "oldest" | "alphabetical";
+
 function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
 
   const {
     data: specs,
@@ -78,9 +107,32 @@ function Dashboard() {
         .select("id, name, description, file_name, status, endpoint_count, api_version, openapi_version, auth_type, created_at, updated_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data as ApiSpec[]) ?? [];
     },
   });
+
+  const filteredAndSortedSpecs = useMemo(() => {
+    if (!specs) return [];
+    
+    let result = specs.filter((s) => 
+      s.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    switch (sortBy) {
+      case "oldest":
+        result.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        break;
+      case "alphabetical":
+        result.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case "newest":
+      default:
+        result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        break;
+    }
+
+    return result;
+  }, [specs, searchQuery, sortBy]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -95,36 +147,37 @@ function Dashboard() {
     .join("");
 
   return (
-    <div className="min-h-screen flex">
-      <aside className="hidden lg:flex w-60 shrink-0 flex-col border-r border-border/60 bg-sidebar">
-        <Link to="/" className="flex items-center gap-2 px-5 h-16 border-b border-border/60">
+    <div className="min-h-screen flex bg-background/50">
+      <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-border/40 bg-card/30 backdrop-blur-sm">
+        <Link to="/" className="flex items-center gap-2 px-6 h-16 border-b border-border/40">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-brand shadow-glow">
             <Zap className="h-4 w-4 text-primary-foreground" strokeWidth={2.5} />
           </span>
-          <span className="font-semibold tracking-tight">APIPilot</span>
+          <span className="font-bold tracking-tight text-lg">APIPilot</span>
         </Link>
-        <nav className="flex-1 p-3 space-y-1">
-          <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <nav className="flex-1 p-4 space-y-1">
+          <p className="px-3 pt-4 pb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
             Workspace
           </p>
           {nav.map((n) => (
             <button
               key={n.label}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                 n.active
-                  ? "bg-accent text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
-              }`}
+                  ? "bg-primary/10 text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
+              )}
             >
               <n.icon className="h-4 w-4" />
               {n.label}
             </button>
           ))}
         </nav>
-        <div className="p-3 border-t border-border/60">
+        <div className="p-4 border-t border-border/40">
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all duration-200"
           >
             <LogOut className="h-4 w-4" />
             Sign out
@@ -133,18 +186,36 @@ function Dashboard() {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-16 border-b border-border/60 glass sticky top-0 z-40">
-          <div className="h-full px-4 sm:px-6 flex items-center gap-3">
-            <div className="relative flex-1 max-w-md">
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search specifications…" className="pl-9 bg-background/60" />
+        <header className="h-16 border-b border-border/40 bg-background/60 backdrop-blur-md sticky top-0 z-40">
+          <div className="h-full px-4 sm:px-8 flex items-center gap-4">
+            <div className="relative flex-1 max-w-xl">
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+              <Input 
+                placeholder="Search specifications by title…" 
+                className="pl-10 bg-muted/40 border-border/40 focus:bg-background transition-all"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-            <div className="ml-auto flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="rounded-full">
+            <div className="ml-auto flex items-center gap-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="hidden sm:flex gap-2 border-border/40">
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                    Sort: {sortBy.charAt(0).toUpperCase() + sortBy.slice(1)}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem onClick={() => setSortBy("newest")}>Newest First</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSortBy("oldest")}>Oldest First</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSortBy("alphabetical")}>Alphabetical</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button variant="ghost" size="icon" className="rounded-full h-9 w-9 border border-border/40 sm:border-0">
                 <Bell className="h-4 w-4" />
               </Button>
               <div
-                className="h-8 w-8 rounded-full bg-gradient-brand grid place-items-center text-xs font-semibold text-primary-foreground"
+                className="h-9 w-9 rounded-full bg-gradient-brand grid place-items-center text-xs font-bold text-primary-foreground shadow-glow"
                 title={user?.email ?? ""}
               >
                 {initials || "U"}
@@ -153,14 +224,14 @@ function Dashboard() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-sm text-muted-foreground">Welcome back</p>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Your API specifications</h1>
+        <main className="flex-1 p-4 sm:p-8 space-y-8">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-primary">Welcome back</p>
+              <h1 className="text-3xl font-bold tracking-tight">Your API specifications</h1>
             </div>
             <Button 
-              className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow"
+              className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow h-11 px-6 font-semibold"
               onClick={() => setUploadModalOpen(true)}
             >
               <Upload className="mr-2 h-4 w-4" />
@@ -169,17 +240,35 @@ function Dashboard() {
           </div>
 
           {isLoading ? (
-            <div className="rounded-xl border border-border bg-card/60 p-16 grid place-items-center text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse border-border/40">
+                  <CardHeader className="h-32 bg-muted/20" />
+                  <CardContent className="h-24" />
+                </Card>
+              ))}
             </div>
           ) : isError ? (
-            <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-6 text-sm text-destructive">
-              Couldn't load your specifications: {(error as Error).message}
+            <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center space-y-3">
+              <AlertTriangle className="h-8 w-8 text-destructive mx-auto" />
+              <p className="text-sm font-medium text-destructive">
+                Couldn't load your specifications: {(error as Error).message}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                Try again
+              </Button>
             </div>
-          ) : !specs || specs.length === 0 ? (
-            <EmptyState onUploadClick={() => setUploadModalOpen(true)} />
+          ) : filteredAndSortedSpecs.length === 0 ? (
+            <EmptyState 
+              onUploadClick={() => setUploadModalOpen(true)} 
+              isSearch={searchQuery.length > 0} 
+            />
           ) : (
-            <SpecList specs={specs} />
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in duration-700">
+              {filteredAndSortedSpecs.map((s) => (
+                <SpecCard key={s.id} spec={s} />
+              ))}
+            </div>
           )}
         </main>
       </div>
@@ -192,72 +281,159 @@ function Dashboard() {
   );
 }
 
-function EmptyState({ onUploadClick }: { onUploadClick: () => void }) {
+function SpecCard({ spec }: { spec: ApiSpec }) {
+  const navigate = useNavigate();
+
+  const statusConfig = {
+    uploaded: { label: "Uploaded", color: "bg-slate-500/10 text-slate-400 border-slate-500/20", icon: Clock },
+    processing: { label: "Generating documentation...", color: "bg-blue-500/10 text-blue-400 border-blue-500/20", icon: Loader2 },
+    completed: { label: "Completed", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", icon: Check },
+    failed: { label: "Failed", color: "bg-rose-500/10 text-rose-400 border-rose-500/20", icon: AlertTriangleIcon },
+  };
+
+  const config = statusConfig[spec.status];
+
   return (
-    <div className="rounded-xl border border-dashed border-border bg-card/40 p-12 text-center">
-      <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-brand shadow-glow">
-        <FileJson className="h-6 w-6 text-primary-foreground" />
+    <Card className="group border-border/40 bg-card/40 backdrop-blur-sm hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 transition-all duration-300 overflow-hidden flex flex-col">
+      <CardHeader className="pb-3">
+        <div className="flex justify-between items-start gap-2">
+          <div className="p-2 rounded-lg bg-primary/5 text-primary border border-primary/10 group-hover:scale-110 transition-transform duration-300">
+            <FileJson className="h-5 w-5" />
+          </div>
+          <Badge 
+            variant="outline" 
+            className={cn("text-[10px] uppercase tracking-wider font-bold py-0.5 px-2 flex items-center gap-1.5", config.color)}
+          >
+            {spec.status === "processing" && <config.icon className="h-3 w-3 animate-spin" />}
+            {config.label}
+          </Badge>
+        </div>
+        <CardTitle className="text-xl mt-4 line-clamp-1 group-hover:text-primary transition-colors">
+          {spec.name}
+        </CardTitle>
+        <p className="text-xs text-muted-foreground/60 font-mono truncate">
+          {spec.file_name}
+        </p>
+      </CardHeader>
+      
+      <CardContent className="pb-6 flex-1">
+        <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem] mb-6">
+          {spec.description || "No description provided for this API specification."}
+        </p>
+        
+        <div className="grid grid-cols-2 gap-y-4 gap-x-2">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/50">
+              <Hash className="h-3 w-3" /> Endpoints
+            </div>
+            <p className="text-sm font-semibold">{spec.endpoint_count}</p>
+          </div>
+          <div className="space-y-1 text-right sm:text-left">
+            <div className="flex items-center justify-end sm:justify-start gap-1.5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/50">
+              <Shield className="h-3 w-3" /> Auth
+            </div>
+            <p className="text-sm font-semibold truncate">{spec.auth_type || "None"}</p>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/50">
+              <Zap className="h-3 w-3" /> Version
+            </div>
+            <p className="text-sm font-semibold">{spec.api_version || "N/A"}</p>
+          </div>
+          <div className="space-y-1 text-right sm:text-left">
+            <div className="flex items-center justify-end sm:justify-start gap-1.5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/50">
+              <Calendar className="h-3 w-3" /> Uploaded
+            </div>
+            <p className="text-sm font-semibold">
+              {formatDistanceToNow(new Date(spec.created_at), { addSuffix: true })}
+            </p>
+          </div>
+        </div>
+      </CardContent>
+
+      <CardFooter className="pt-0 pb-6">
+        {spec.status === "completed" ? (
+          <Button 
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-sm group/btn"
+            onClick={() => navigate({ to: `/docs/${spec.id}` })}
+          >
+            View Documentation
+            <ExternalLink className="ml-2 h-4 w-4 opacity-50 group-hover/btn:opacity-100 transition-opacity" />
+          </Button>
+        ) : spec.status === "processing" ? (
+          <Button disabled className="w-full font-semibold">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Generating...
+          </Button>
+        ) : spec.status === "failed" ? (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="w-full">
+                  <Button disabled variant="outline" className="w-full font-semibold border-destructive/20 text-destructive/60">
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Retry Generation
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Coming in the next update.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          <Button disabled variant="outline" className="w-full font-semibold">
+            Awaiting Processing
+          </Button>
+        )}
+      </CardFooter>
+    </Card>
+  );
+}
+
+function EmptyState({ onUploadClick, isSearch }: { onUploadClick: () => void; isSearch: boolean }) {
+  return (
+    <div className="rounded-2xl border-2 border-dashed border-border/40 bg-card/20 p-16 text-center animate-in zoom-in-95 duration-500">
+      <div className="mx-auto grid h-20 w-20 place-items-center rounded-2xl bg-gradient-brand shadow-glow mb-6">
+        <Sparkles className="h-10 w-10 text-primary-foreground" />
       </div>
-      <h3 className="mt-4 font-semibold">No API specifications uploaded yet.</h3>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Upload an OpenAPI or Swagger file to get started.
+      <h3 className="text-2xl font-bold tracking-tight mb-2">
+        {isSearch ? "No matching specifications found" : "No API Specifications Yet"}
+      </h3>
+      <p className="text-muted-foreground max-w-md mx-auto mb-8">
+        {isSearch 
+          ? "Try adjusting your search query to find what you're looking for." 
+          : "Upload an OpenAPI or Swagger specification to automatically generate professional AI-powered documentation."}
       </p>
       <Button 
-        className="mt-6 bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow"
+        className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow h-12 px-8 font-bold"
         onClick={onUploadClick}
       >
         <Upload className="mr-2 h-4 w-4" />
-        Upload API Specification
+        {isSearch ? "Upload New Specification" : "Upload API Specification"}
       </Button>
     </div>
   );
 }
 
-const statusStyles: Record<ApiSpec["status"], string> = {
-  uploaded: "bg-sky-500/10 text-sky-400 border-sky-500/20",
-  processing: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  completed: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  failed: "bg-rose-500/10 text-rose-400 border-rose-500/20",
-};
-
-function SpecList({ specs }: { specs: ApiSpec[] }) {
+function AlertTriangle({ className, ...props }: { className?: string; [key: string]: any }) {
   return (
-    <div className="rounded-xl border border-border bg-card/60 shadow-card overflow-hidden">
-      <ul className="divide-y divide-border/60">
-        {specs.map((s) => (
-          <li key={s.id} className="flex items-center gap-4 px-5 py-4 hover:bg-accent/40 transition-colors">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border bg-background/60">
-              <FileJson className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="font-medium truncate">{s.name}</p>
-                <span className={`text-[10px] uppercase tracking-wider font-semibold border rounded px-1.5 py-0.5 flex items-center gap-1 ${statusStyles[s.status]}`}>
-                  {s.status === "processing" && <Loader2 className="h-2 w-2 animate-spin" />}
-                  {s.status}
-                </span>
-                {s.api_version && (
-                  <span className="text-[10px] text-muted-foreground font-mono">v{s.api_version}</span>
-                )}
-              </div>
-              <div className="flex items-center gap-3 mt-0.5">
-                <p className="text-xs text-muted-foreground truncate font-mono">{s.file_name}</p>
-                {s.auth_type && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/50 text-muted-foreground">
-                    {s.auth_type}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-semibold">{s.endpoint_count} endpoints</p>
-              <p className="text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(s.updated_at), { addSuffix: true })}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <svg
+      className={className}
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </svg>
   );
 }
