@@ -18,6 +18,16 @@ import {
   Shield,
   Hash,
   Tag,
+  Search,
+  ChevronRight,
+  ChevronDown,
+  Calendar,
+  Clock,
+  FileText,
+  Globe,
+  Lock,
+  Printer,
+  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +48,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { deleteApiSpec } from "@/services/delete-spec";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { format } from "date-fns";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 export const Route = createFileRoute("/_authenticated/docs/$specId")({
   head: () => ({
@@ -52,7 +75,7 @@ export const Route = createFileRoute("/_authenticated/docs/$specId")({
   component: DocsPage,
 });
 
-type Spec = {
+  type Spec = {
   id: string;
   name: string;
   description: string | null;
@@ -63,6 +86,7 @@ type Spec = {
   auth_type: string | null;
   endpoint_count: number;
   servers: any;
+  created_at: string;
 };
 
 type Doc = {
@@ -71,6 +95,7 @@ type Doc = {
   quick_start: string | null;
   best_practices: string | null;
   full_markdown: string | null;
+  updated_at: string;
 };
 
 type Endpoint = {
@@ -119,6 +144,12 @@ function DocsPage() {
   const [copied, setCopied] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedTags, setExpandedTags] = useState<Record<string, boolean>>({});
+
+  const toggleTag = (tag: string) => {
+    setExpandedTags((prev) => ({ ...prev, [tag]: !prev[tag] }));
+  };
 
   const handleDelete = async () => {
     if (!data?.spec) return;
@@ -182,6 +213,31 @@ function DocsPage() {
 
   const fullMarkdown = data?.doc?.full_markdown ?? buildFallbackMarkdown(data?.doc ?? null, data?.spec);
 
+  const filteredEndpoints = useMemo(() => {
+    if (!data?.endpoints) return [];
+    if (!searchQuery) return data.endpoints;
+    const q = searchQuery.toLowerCase();
+    return data.endpoints.filter(
+      (e) =>
+        e.path.toLowerCase().includes(q) ||
+        e.summary?.toLowerCase().includes(q) ||
+        e.operation_id?.toLowerCase().includes(q) ||
+        e.tags?.some((t) => t.toLowerCase().includes(q))
+    );
+  }, [data?.endpoints, searchQuery]);
+
+  const endpointsByTag = useMemo(() => {
+    const groups: Record<string, Endpoint[]> = {};
+    filteredEndpoints.forEach((e) => {
+      const tags = e.tags && e.tags.length > 0 ? e.tags : ["Untagged"];
+      tags.forEach((tag) => {
+        if (!groups[tag]) groups[tag] = [];
+        groups[tag].push(e);
+      });
+    });
+    return groups;
+  }, [filteredEndpoints]);
+
   const copyMarkdown = async () => {
     if (!fullMarkdown) return;
     await navigator.clipboard.writeText(fullMarkdown);
@@ -201,6 +257,26 @@ function DocsPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    toast.success("Markdown exported");
+  };
+
+  const downloadPlainText = () => {
+    if (!fullMarkdown || !data?.spec) return;
+    // Simple regex to strip some markdown syntax for plain text
+    const plainText = fullMarkdown
+      .replace(/#+\s/g, "")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/`{1,3}/g, "");
+    const blob = new Blob([plainText], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${data.spec.name.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Plain text exported");
   };
 
   if (isLoading) return <LoadingState />;
@@ -209,7 +285,7 @@ function DocsPage() {
   const { spec, doc, endpoints } = data;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background selection:bg-primary/10 selection:text-primary">
       {/* Toolbar */}
       <div className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
@@ -223,24 +299,84 @@ function DocsPage() {
             <span className="hidden sm:inline">Back to Dashboard</span>
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={copyMarkdown} disabled={!fullMarkdown} className="gap-2">
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              <span className="hidden sm:inline">Copy Markdown</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={downloadMarkdown} disabled={!fullMarkdown} className="gap-2">
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Download .md</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 text-destructive hover:text-destructive"
-              onClick={() => setDeleteDialogOpen(true)}
-              disabled={isDeleting}
-            >
-              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              <span className="hidden sm:inline">{isDeleting ? "Deleting..." : "Delete API"}</span>
-            </Button>
+            <div className="hidden items-center gap-2 md:flex">
+              <Button variant="outline" size="sm" onClick={copyMarkdown} disabled={!fullMarkdown} className="gap-2">
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                <span>Copy Markdown</span>
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={!fullMarkdown} className="gap-2">
+                    <Download className="h-4 w-4" />
+                    <span>Export</span>
+                    <ChevronDown className="h-3 w-3 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={downloadMarkdown} className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    <span>Markdown (.md)</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={downloadPlainText} className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    <span>Plain Text (.txt)</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => window.print()} className="gap-2">
+                    <Printer className="h-4 w-4" />
+                    <span>PDF (Print)</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Separator orientation="vertical" className="h-6" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setDeleteDialogOpen(true)}
+                disabled={isDeleting}
+              >
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                <span>Delete</span>
+              </Button>
+            </div>
+
+            {/* Mobile Actions */}
+            <div className="md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={copyMarkdown} disabled={!fullMarkdown} className="gap-2">
+                    <Copy className="h-4 w-4" />
+                    <span>Copy Markdown</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={downloadMarkdown} disabled={!fullMarkdown} className="gap-2">
+                    <Download className="h-4 w-4" />
+                    <span>Download .md</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={downloadPlainText} disabled={!fullMarkdown} className="gap-2">
+                    <Download className="h-4 w-4" />
+                    <span>Download .txt</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => window.print()} disabled={!fullMarkdown} className="gap-2">
+                    <Printer className="h-4 w-4" />
+                    <span>Print to PDF</span>
+                  </DropdownMenuItem>
+                  <Separator className="my-1" />
+                  <DropdownMenuItem
+                    onClick={() => setDeleteDialogOpen(true)}
+                    disabled={isDeleting}
+                    className="gap-2 text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Delete API</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </div>
@@ -248,6 +384,18 @@ function DocsPage() {
       <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[260px_minmax(0,1fr)]">
         {/* Sidebar */}
         <aside className="lg:sticky lg:top-20 lg:h-[calc(100vh-6rem)] lg:overflow-y-auto">
+          <div className="mb-4 px-3">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search endpoints..."
+                className="h-9 pl-9 text-xs"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
           <nav className="space-y-1">
             {sections.map((s) => (
               <SidebarLink
@@ -258,7 +406,7 @@ function DocsPage() {
               />
             ))}
 
-            {endpoints.length > 0 && (
+            {Object.keys(endpointsByTag).length > 0 && (
               <>
                 <div className="my-4 flex items-center gap-2 px-3">
                   <Separator className="flex-1" />
@@ -267,25 +415,46 @@ function DocsPage() {
                   </span>
                   <Separator className="flex-1" />
                 </div>
-                <div className="space-y-0.5">
-                  {endpoints.map((e) => {
-                    const id = slugifyEndpoint(e);
-                    return (
-                      <button
-                        key={e.id}
-                        onClick={() => scrollTo(id)}
-                        className={cn(
-                          "group flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-xs font-mono transition-colors",
-                          activeId === id
-                            ? "bg-muted text-foreground"
-                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                <div className="space-y-1">
+                  {Object.entries(endpointsByTag).sort().map(([tag, eps]) => (
+                    <Collapsible
+                      key={tag}
+                      open={expandedTags[tag] !== false}
+                      onOpenChange={() => toggleTag(tag)}
+                    >
+                      <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground">
+                        {expandedTags[tag] !== false ? (
+                          <ChevronDown className="h-3 w-3" />
+                        ) : (
+                          <ChevronRight className="h-3 w-3" />
                         )}
-                      >
-                        <MethodBadge method={e.method} size="xs" />
-                        <span className="truncate">{e.path}</span>
-                      </button>
-                    );
-                  })}
+                        <span className="truncate">{tag}</span>
+                        <span className="ml-auto text-[10px] font-normal text-muted-foreground/60">
+                          {eps.length}
+                        </span>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-0.5 pt-0.5">
+                        {eps.map((e) => {
+                          const id = slugifyEndpoint(e);
+                          return (
+                            <button
+                              key={e.id}
+                              onClick={() => scrollTo(id)}
+                              className={cn(
+                                "group flex w-full items-center gap-2 rounded-md py-1.5 pl-8 pr-3 text-left text-xs font-mono transition-colors",
+                                activeId === id
+                                  ? "bg-muted text-foreground"
+                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                              )}
+                            >
+                              <MethodBadge method={e.method} size="xs" />
+                              <span className="truncate">{e.path}</span>
+                            </button>
+                          );
+                        })}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ))}
                 </div>
               </>
             )}
@@ -293,33 +462,50 @@ function DocsPage() {
         </aside>
 
         {/* Main content */}
-        <main className="min-w-0 space-y-12">
+        <main className="min-w-0 max-w-4xl space-y-16">
           {/* Header */}
-          <header className="space-y-4">
+          <header className="space-y-6">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={spec.status} />
               {spec.openapi_version && (
-                <Badge variant="outline" className="font-mono">
+                <Badge variant="outline" className="bg-muted/50 font-mono text-[10px] uppercase tracking-wider">
                   OpenAPI {spec.openapi_version}
                 </Badge>
               )}
               {spec.api_version && (
-                <Badge variant="outline" className="font-mono">
+                <Badge variant="outline" className="bg-muted/50 font-mono text-[10px] uppercase tracking-wider">
                   v{spec.api_version}
                 </Badge>
               )}
             </div>
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{spec.name}</h1>
-            {spec.description && (
-              <p className="max-w-3xl text-lg leading-relaxed text-muted-foreground">
-                {spec.description}
-              </p>
-            )}
+            <div className="space-y-2">
+              <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl">{spec.name}</h1>
+              {spec.description && (
+                <p className="text-xl leading-relaxed text-muted-foreground/90">
+                  {spec.description}
+                </p>
+              )}
+            </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-4 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 pt-4 sm:grid-cols-3 lg:grid-cols-4">
               <MetaCard icon={Hash} label="Endpoints" value={String(spec.endpoint_count)} />
-              <MetaCard icon={Shield} label="Auth" value={spec.auth_type || "None"} />
-              <MetaCard icon={Tag} label="Version" value={spec.api_version || "—"} />
+              <MetaCard icon={Lock} label="Authentication" value={spec.auth_type || "None"} />
+              <MetaCard icon={Tag} label="API Version" value={spec.api_version || "—"} />
+              <MetaCard
+                icon={Globe}
+                label="OpenAPI"
+                value={spec.openapi_version || "—"}
+              />
+              <MetaCard 
+                icon={Calendar} 
+                label="Uploaded" 
+                value={spec.created_at ? format(new Date(spec.created_at), "MMM d, yyyy") : "—"} 
+              />
+              <MetaCard 
+                icon={Clock} 
+                label="Generated" 
+                value={doc?.updated_at ? format(new Date(doc.updated_at), "MMM d, yyyy") : "—"} 
+              />
               <MetaCard
                 icon={Server}
                 label="Servers"
@@ -329,19 +515,23 @@ function DocsPage() {
                     : "0"
                 }
               />
+              <MetaCard icon={Shield} label="Status" value={spec.status} />
             </div>
 
             {Array.isArray(spec.servers) && spec.servers.length > 0 && (
-              <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Servers
+              <div className="rounded-xl border border-border/40 bg-muted/20 p-5">
+                <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">
+                  API Servers
                 </div>
-                <div className="space-y-1 font-mono text-sm">
+                <div className="space-y-2 font-mono text-sm">
                   {spec.servers.map((s: any, i: number) => (
-                    <div key={i} className="text-foreground">
-                      {typeof s === "string" ? s : s.url || JSON.stringify(s)}
+                    <div key={i} className="flex items-center gap-3 text-foreground/80">
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary/60" />
+                      <span className="select-all">
+                        {typeof s === "string" ? s : s.url || JSON.stringify(s)}
+                      </span>
                       {typeof s === "object" && s?.description && (
-                        <span className="ml-2 text-muted-foreground">— {s.description}</span>
+                        <span className="text-xs text-muted-foreground/60">— {s.description}</span>
                       )}
                     </div>
                   ))}
@@ -356,8 +546,11 @@ function DocsPage() {
           {/* Doc sections */}
           {doc &&
             sections.map((s) => (
-              <section key={s.id} id={s.id} className="scroll-mt-24">
-                <h2 className="mb-4 text-3xl font-bold tracking-tight">{s.label}</h2>
+              <section key={s.id} id={s.id} className="scroll-mt-32 space-y-6">
+                <div className="space-y-2">
+                  <h2 className="text-3xl font-bold tracking-tight text-foreground">{s.label}</h2>
+                  <Separator className="w-12 border-2 border-primary/20" />
+                </div>
                 {s.content ? (
                   <Markdown content={s.content} />
                 ) : (
@@ -369,15 +562,28 @@ function DocsPage() {
             ))}
 
           {/* Endpoints */}
-          {endpoints.length > 0 && (
-            <section className="space-y-4">
-              <h2 className="text-3xl font-bold tracking-tight">Endpoints</h2>
-              <div className="space-y-3">
-                {endpoints.map((e) => (
+          {filteredEndpoints.length > 0 && (
+            <section className="scroll-mt-32 space-y-8">
+              <div className="space-y-2">
+                <h2 className="text-3xl font-bold tracking-tight text-foreground">
+                  {searchQuery ? "Search Results" : "Endpoints"}
+                </h2>
+                <Separator className="w-12 border-2 border-primary/20" />
+              </div>
+              <div className="space-y-6">
+                {filteredEndpoints.map((e) => (
                   <EndpointCard key={e.id} endpoint={e} id={slugifyEndpoint(e)} />
                 ))}
               </div>
             </section>
+          )}
+
+          {searchQuery && filteredEndpoints.length === 0 && (
+            <div className="py-20 text-center">
+              <Search className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
+              <h3 className="text-lg font-medium text-foreground">No endpoints found</h3>
+              <p className="text-muted-foreground">Try adjusting your search query.</p>
+            </div>
           )}
         </main>
       </div>
@@ -435,8 +641,9 @@ function SidebarLink({
   return (
     <button
       onClick={onClick}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "flex w-full items-center rounded-md px-3 py-2 text-left text-sm transition-colors",
+        "flex w-full items-center rounded-md px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
         active
           ? "bg-muted font-medium text-foreground"
           : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
@@ -507,11 +714,32 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function EndpointCard({ endpoint, id }: { endpoint: Endpoint; id: string }) {
+  const copyPath = () => {
+    navigator.clipboard.writeText(endpoint.path);
+    toast.success("Endpoint path copied");
+  };
+
+  const copyMarkdown = () => {
+    const md = `### ${endpoint.method.toUpperCase()} ${endpoint.path}\n\n${endpoint.summary || ""}\n\n${endpoint.operation_id ? `**Operation ID:** \`${endpoint.operation_id}\`` : ""}`;
+    navigator.clipboard.writeText(md);
+    toast.success("Endpoint markdown copied");
+  };
+
   return (
     <Card id={id} className="scroll-mt-24 border-border/40 bg-card/50 backdrop-blur-sm transition-all hover:border-border/60 hover:shadow-md">
-      <div className="flex items-center gap-3 border-b border-border/40 px-4 py-3">
-        <MethodBadge method={endpoint.method} />
-        <code className="text-sm font-semibold tracking-tight text-foreground">{endpoint.path}</code>
+      <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <MethodBadge method={endpoint.method} />
+          <code className="text-sm font-semibold tracking-tight text-foreground">{endpoint.path}</code>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyPath} title="Copy Path">
+            <Copy className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyMarkdown} title="Copy Markdown">
+            <FileJson className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
       <div className="p-4">
         <h3 className="mb-2 font-semibold text-foreground">{endpoint.summary || "No summary available"}</h3>
@@ -550,12 +778,39 @@ function Markdown({ content }: { content: string }) {
               {...p}
             />
           ),
-          pre: ({ node, ...p }) => (
-            <pre
-              className="my-4 overflow-x-auto rounded-lg border border-border/60 bg-[#0d1117] p-4 text-sm"
-              {...p}
-            />
-          ),
+          pre: ({ node, children, ...p }) => {
+            const code = (children as any)?.props?.children || "";
+            const lang = (children as any)?.props?.className?.replace("language-", "") || "text";
+            
+            const copyCode = () => {
+              navigator.clipboard.writeText(code);
+              toast.success("Code copied to clipboard");
+            };
+
+            return (
+              <div className="group relative my-6">
+                <div className="absolute right-3 top-3 z-10 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Badge variant="secondary" className="bg-muted/80 text-[10px] uppercase backdrop-blur-sm">
+                    {lang}
+                  </Badge>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-7 w-7 bg-muted/80 backdrop-blur-sm"
+                    onClick={copyCode}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <pre
+                  className="overflow-x-auto rounded-lg border border-border/60 bg-[#0d1117] p-4 text-sm scrollbar-thin scrollbar-thumb-border"
+                  {...p}
+                >
+                  {children}
+                </pre>
+              </div>
+            );
+          },
           table: ({ node, ...p }) => (
             <div className="my-4 overflow-x-auto rounded-lg border border-border/60">
               <table className="w-full border-collapse text-sm" {...p} />
