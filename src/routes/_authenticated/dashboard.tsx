@@ -25,6 +25,7 @@ import {
   RefreshCw,
   Check,
   AlertTriangle as AlertTriangleIcon,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +47,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { deleteApiSpec } from "@/services/delete-spec";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -75,6 +89,7 @@ type ApiSpec = {
   name: string;
   description: string | null;
   file_name: string;
+  file_path: string;
   status: "uploaded" | "processing" | "completed" | "failed";
   endpoint_count: number;
   api_version: string | null;
@@ -104,7 +119,7 @@ function Dashboard() {
     queryFn: async (): Promise<ApiSpec[]> => {
       const { data, error } = await supabase
         .from("api_specs")
-        .select("id, name, description, file_name, status, endpoint_count, api_version, openapi_version, auth_type, created_at, updated_at")
+        .select("id, name, description, file_name, file_path, status, endpoint_count, api_version, openapi_version, auth_type, created_at, updated_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data as ApiSpec[]) ?? [];
@@ -283,6 +298,27 @@ function Dashboard() {
 
 function SpecCard({ spec }: { spec: ApiSpec }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const result = await deleteApiSpec(spec.id, spec.file_path);
+      if (result.success) {
+        toast.success("Specification deleted successfully.");
+        queryClient.invalidateQueries({ queryKey: ["api_specs"] });
+      } else {
+        toast.error(result.error || "Failed to delete specification.");
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred.");
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
 
   const statusConfig = {
     uploaded: { label: "Uploaded", color: "bg-slate-500/10 text-slate-400 border-slate-500/20", icon: Clock },
@@ -294,27 +330,47 @@ function SpecCard({ spec }: { spec: ApiSpec }) {
   const config = statusConfig[spec.status];
 
   return (
-    <Card className="group border-border/40 bg-card/40 backdrop-blur-sm hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 transition-all duration-300 overflow-hidden flex flex-col">
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-start gap-2">
-          <div className="p-2 rounded-lg bg-primary/5 text-primary border border-primary/10 group-hover:scale-110 transition-transform duration-300">
-            <FileJson className="h-5 w-5" />
+    <>
+      <Card className="group border-border/40 bg-card/40 backdrop-blur-sm hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 transition-all duration-300 overflow-hidden flex flex-col relative">
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-start gap-2">
+            <div className="p-2 rounded-lg bg-primary/5 text-primary border border-primary/10 group-hover:scale-110 transition-transform duration-300">
+              <FileJson className="h-5 w-5" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge 
+                variant="outline" 
+                className={cn("text-[10px] uppercase tracking-wider font-bold py-0.5 px-2 flex items-center gap-1.5", config.color)}
+              >
+                {spec.status === "processing" && <config.icon className="h-3 w-3 animate-spin" />}
+                {config.label}
+              </Badge>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem 
+                    className="text-destructive focus:text-destructive gap-2"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Specification
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-          <Badge 
-            variant="outline" 
-            className={cn("text-[10px] uppercase tracking-wider font-bold py-0.5 px-2 flex items-center gap-1.5", config.color)}
-          >
-            {spec.status === "processing" && <config.icon className="h-3 w-3 animate-spin" />}
-            {config.label}
-          </Badge>
-        </div>
-        <CardTitle className="text-xl mt-4 line-clamp-1 group-hover:text-primary transition-colors">
-          {spec.name}
-        </CardTitle>
-        <p className="text-xs text-muted-foreground/60 font-mono truncate">
-          {spec.file_name}
-        </p>
-      </CardHeader>
+          <CardTitle className="text-xl mt-4 line-clamp-1 group-hover:text-primary transition-colors">
+            {spec.name}
+          </CardTitle>
+          <p className="text-xs text-muted-foreground/60 font-mono truncate">
+            {spec.file_name}
+          </p>
+        </CardHeader>
       
       <CardContent className="pb-6 flex-1">
         <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem] mb-6">
@@ -356,6 +412,7 @@ function SpecCard({ spec }: { spec: ApiSpec }) {
           <Button 
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-sm group/btn"
             onClick={() => navigate({ to: `/docs/${spec.id}` })}
+            disabled={isDeleting}
           >
             View Documentation
             <ExternalLink className="ml-2 h-4 w-4 opacity-50 group-hover/btn:opacity-100 transition-opacity" />
@@ -388,6 +445,45 @@ function SpecCard({ spec }: { spec: ApiSpec }) {
         )}
       </CardFooter>
     </Card>
+
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete API Specification?</AlertDialogTitle>
+          <AlertDialogDescription className="space-y-3">
+            <p>This action cannot be undone.</p>
+            <p className="font-medium text-foreground">The following will be permanently deleted:</p>
+            <ul className="list-disc list-inside space-y-1 text-sm">
+              <li>Uploaded specification</li>
+              <li>Parsed endpoints</li>
+              <li>AI generated documentation</li>
+              <li>Dashboard entry</li>
+            </ul>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction 
+            onClick={(e) => {
+              e.preventDefault();
+              handleDelete();
+            }}
+            disabled={isDeleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isDeleting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Deleting...
+              </>
+            ) : (
+              "Delete Specification"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 

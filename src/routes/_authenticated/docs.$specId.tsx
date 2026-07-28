@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -24,9 +24,20 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { deleteApiSpec } from "@/services/delete-spec";
 
 export const Route = createFileRoute("/_authenticated/docs/$specId")({
   head: () => ({
@@ -46,6 +57,7 @@ type Spec = {
   name: string;
   description: string | null;
   status: string;
+  file_path: string;
   api_version: string | null;
   openapi_version: string | null;
   auth_type: string | null;
@@ -92,6 +104,7 @@ async function fetchAll(specId: string) {
 function DocsPage() {
   const { specId } = Route.useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["docs", specId],
     queryFn: () => fetchAll(specId),
@@ -104,6 +117,28 @@ function DocsPage() {
 
   const [activeId, setActiveId] = useState<string>("overview");
   const [copied, setCopied] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const handleDelete = async () => {
+    if (!data?.spec) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteApiSpec(data.spec.id, data.spec.file_path);
+      if (result.success) {
+        toast.success("Specification deleted successfully.");
+        queryClient.invalidateQueries({ queryKey: ["api_specs"] });
+        navigate({ to: "/dashboard" });
+      } else {
+        toast.error(result.error || "Failed to delete specification.");
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred.");
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
 
   const sections = useMemo(
     () => [
@@ -200,10 +235,11 @@ function DocsPage() {
               variant="outline"
               size="sm"
               className="gap-2 text-destructive hover:text-destructive"
-              onClick={() => toast.info("Delete coming soon")}
+              onClick={() => setDeleteDialogOpen(true)}
+              disabled={isDeleting}
             >
-              <Trash2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Delete API</span>
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              <span className="hidden sm:inline">{isDeleting ? "Deleting..." : "Delete API"}</span>
             </Button>
           </div>
         </div>
@@ -345,6 +381,44 @@ function DocsPage() {
           )}
         </main>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete API Specification?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>This action cannot be undone.</p>
+              <p className="font-medium text-foreground">The following will be permanently deleted:</p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>Uploaded specification</li>
+                <li>Parsed endpoints</li>
+                <li>AI generated documentation</li>
+                <li>Dashboard entry</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Specification"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -422,11 +496,11 @@ function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     completed: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
     processing: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-    uploaded: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+    uploaded: "bg-slate-500/15 text-slate-400 border-slate-500/30",
     failed: "bg-red-500/15 text-red-400 border-red-500/30",
   };
   return (
-    <Badge variant="outline" className={cn("capitalize", map[status])}>
+    <Badge variant="outline" className={cn("capitalize", map[status] ?? "")}>
       {status}
     </Badge>
   );
@@ -434,34 +508,22 @@ function StatusBadge({ status }: { status: string }) {
 
 function EndpointCard({ endpoint, id }: { endpoint: Endpoint; id: string }) {
   return (
-    <Card
-      id={id}
-      className="scroll-mt-24 border-border/60 p-4 transition-all hover:border-border hover:shadow-lg hover:-translate-y-0.5"
-    >
-      <div className="flex flex-wrap items-start gap-3">
+    <Card id={id} className="scroll-mt-24 border-border/40 bg-card/50 backdrop-blur-sm transition-all hover:border-border/60 hover:shadow-md">
+      <div className="flex items-center gap-3 border-b border-border/40 px-4 py-3">
         <MethodBadge method={endpoint.method} />
-        <div className="min-w-0 flex-1">
-          <div className="font-mono text-sm font-semibold text-foreground break-all">
-            {endpoint.path}
+        <code className="text-sm font-semibold tracking-tight text-foreground">{endpoint.path}</code>
+      </div>
+      <div className="p-4">
+        <h3 className="mb-2 font-semibold text-foreground">{endpoint.summary || "No summary available"}</h3>
+        {endpoint.tags && endpoint.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {endpoint.tags.map((tag) => (
+              <Badge key={tag} variant="secondary" className="text-[10px] font-medium uppercase tracking-wider">
+                {tag}
+              </Badge>
+            ))}
           </div>
-          {endpoint.summary && (
-            <div className="mt-1 text-sm text-muted-foreground">{endpoint.summary}</div>
-          )}
-          {(endpoint.tags?.length || endpoint.operation_id) && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {endpoint.tags?.map((t) => (
-                <Badge key={t} variant="secondary" className="text-xs">
-                  {t}
-                </Badge>
-              ))}
-              {endpoint.operation_id && (
-                <span className="font-mono text-xs text-muted-foreground">
-                  {endpoint.operation_id}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </Card>
   );
@@ -469,7 +531,7 @@ function EndpointCard({ endpoint, id }: { endpoint: Endpoint; id: string }) {
 
 function Markdown({ content }: { content: string }) {
   return (
-    <div className="prose-doc">
+    <div className="prose prose-sm prose-invert max-w-none">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
@@ -483,23 +545,11 @@ function Markdown({ content }: { content: string }) {
           li: ({ node, ...p }) => <li className="leading-7" {...p} />,
           a: ({ node, ...p }) => <a className="text-primary underline underline-offset-2 hover:no-underline" {...p} />,
           blockquote: ({ node, ...p }) => (
-            <blockquote className="my-4 border-l-2 border-primary/50 bg-muted/30 py-2 pl-4 italic text-muted-foreground" {...p} />
+            <blockquote
+              className="my-4 border-l-4 border-primary/40 bg-muted/30 py-2 pl-4 italic text-muted-foreground"
+              {...p}
+            />
           ),
-          code: ({ node, className, children, ...props }: any) => {
-            const inline = !className;
-            if (inline) {
-              return (
-                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground" {...props}>
-                  {children}
-                </code>
-              );
-            }
-            return (
-              <code className={cn("font-mono text-sm", className)} {...props}>
-                {children}
-              </code>
-            );
-          },
           pre: ({ node, ...p }) => (
             <pre
               className="my-4 overflow-x-auto rounded-lg border border-border/60 bg-[#0d1117] p-4 text-sm"
