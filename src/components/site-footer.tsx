@@ -2,10 +2,10 @@ import { Zap, Github, Twitter } from "lucide-react";
 
 export function SiteFooter() {
   const cols = [
-    { title: "Product", links: ["Features", "Pricing", "Changelog", "Roadmap"] },
-    { title: "Developers", links: ["Documentation", "API Reference", "SDKs", "Status"] },
-    { title: "Company", links: ["About", "Blog", "Careers", "Contact"] },
-    { title: "Legal", links: ["Privacy", "Terms", "Security", "DPA"] },
+    { title: "Product", links: ["Features", "Changelog", "Roadmap"] },
+    { title: "Developers", links: ["Documentation", "GitHub", "Status"] },
+    { title: "Company", links: ["About", "Contact"] },
+    { title: "Legal", links: ["Privacy", "Terms"] },
   ];
   return (
     <footer className="border-t border-border/60 mt-24">

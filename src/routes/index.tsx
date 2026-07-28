@@ -4,17 +4,32 @@ import {
   Sparkles,
   Zap,
   Shield,
+  Check,
+  Upload,
+  Bot,
+  Gauge,
   GitBranch,
   Terminal,
-  Gauge,
-  Bot,
-  Upload,
-  Check,
-  Star,
+  FileJson,
+  Activity,
+  ChevronDown,
+  Layout,
+  FileText,
+  MousePointer2,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -22,13 +37,18 @@ export const Route = createFileRoute("/")({
 
 function Landing() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background text-foreground selection:bg-primary/20">
       <SiteHeader />
-      <Hero />
-      <LogoStrip />
-      <UploadPlaceholder />
-      <Features />
-      <Pricing />
+      <main>
+        <Hero />
+        <TrustedFeatures />
+        <HowItWorks />
+        <DashboardPreview />
+        <WhyAPIPilot />
+        <DocPreview />
+        <FAQ />
+        <FinalCTA />
+      </main>
       <SiteFooter />
     </div>
   );
@@ -36,87 +56,74 @@ function Landing() {
 
 function Hero() {
   return (
-    <section className="relative overflow-hidden">
-      <div className="absolute inset-0 bg-hero-glow pointer-events-none" />
-      <div className="absolute inset-0 grid-bg pointer-events-none" />
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 pt-24 pb-20 sm:pt-32 sm:pb-28">
-        <div className="mx-auto max-w-3xl text-center animate-fade-in">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/50 px-3 py-1 text-xs text-muted-foreground backdrop-blur">
-            <Sparkles className="h-3 w-3 text-primary" />
-            <span>Introducing APIPilot v1 — now with agentic workflows</span>
-          </div>
-          <h1 className="mt-6 text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05]">
-            The AI copilot for
-            <br />
-            <span className="text-gradient">API-first developers</span>
-          </h1>
-          <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto">
-            Design, test, and ship reliable APIs faster. APIPilot understands your
-            schemas, generates tests, and catches regressions before they reach production.
-          </p>
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link to="/dashboard">
-              <Button size="lg" className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow group">
-                Start building free
-                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+    <section className="relative pt-20 pb-16 md:pt-32 md:pb-24 overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,hsl(var(--primary)/0.15),transparent_70%)]" />
+      <div className="container relative px-4 mx-auto">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
+          <div className="flex-1 text-center lg:text-left animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <Badge variant="outline" className="mb-6 py-1 px-3 border-primary/20 bg-primary/5 text-primary animate-pulse">
+              <Sparkles className="mr-2 h-3.5 w-3.5" />
+              Now powered by GPT-4o
+            </Badge>
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] mb-6">
+              Generate Beautiful <br />
+              <span className="text-gradient">API Documentation</span> <br />
+              with AI
+            </h1>
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
+              Upload any OpenAPI or Swagger specification and receive production-ready API documentation in seconds. Stop writing docs manually.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+              <Link to="/auth">
+                <Button size="lg" className="h-12 px-8 bg-gradient-brand text-primary-foreground shadow-glow hover:opacity-90 transition-all font-semibold">
+                  Get Started
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+              <Button size="lg" variant="outline" className="h-12 px-8 border-border/60 hover:bg-accent/50 transition-all font-semibold">
+                View Demo
               </Button>
-            </Link>
-            <Button size="lg" variant="outline" className="border-border bg-card/50 backdrop-blur">
-              <Terminal className="mr-2 h-4 w-4" />
-              View live demo
-            </Button>
-          </div>
-          <p className="mt-4 text-xs text-muted-foreground">
-            No credit card required · Free forever for solo devs
-          </p>
-        </div>
-
-        {/* Product preview card */}
-        <div className="relative mt-16 mx-auto max-w-5xl animate-fade-in">
-          <div className="absolute -inset-4 bg-gradient-brand opacity-20 blur-3xl rounded-3xl" />
-          <div className="relative rounded-xl border border-border bg-card shadow-card overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-border px-4 py-2.5 bg-background/50">
-              <div className="flex gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-red-500/70" />
-                <span className="h-2.5 w-2.5 rounded-full bg-yellow-500/70" />
-                <span className="h-2.5 w-2.5 rounded-full bg-green-500/70" />
-              </div>
-              <div className="mx-auto text-xs text-muted-foreground font-mono">
-                apipilot.dev / workspace / production
-              </div>
             </div>
-            <div className="grid md:grid-cols-[220px_1fr] min-h-[380px]">
-              <div className="border-r border-border p-4 space-y-1 hidden md:block bg-background/30">
-                {["Overview", "Endpoints", "Schemas", "Tests", "Insights", "Settings"].map((i, idx) => (
-                  <div
-                    key={i}
-                    className={`px-3 py-1.5 rounded-md text-sm ${idx === 1 ? "bg-accent text-foreground" : "text-muted-foreground"}`}
-                  >
-                    {i}
+          </div>
+          <div className="flex-1 w-full max-w-2xl animate-in fade-in zoom-in duration-1000 delay-200">
+            <div className="relative">
+              <div className="absolute -inset-1 bg-gradient-brand opacity-20 blur-2xl rounded-3xl" />
+              <div className="relative bg-card/40 backdrop-blur-xl border border-border/40 rounded-2xl shadow-2xl overflow-hidden aspect-[4/3]">
+                {/* Mockup Header */}
+                <div className="flex items-center gap-1.5 px-4 py-3 border-b border-border/40 bg-background/40">
+                  <div className="flex gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
                   </div>
-                ))}
-              </div>
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold">Endpoints</h3>
-                  <span className="text-xs text-muted-foreground font-mono">142 active</span>
+                  <div className="mx-auto text-[10px] font-mono text-muted-foreground/60">apipilot.ai / documentation / stripe-v3</div>
                 </div>
-                <div className="space-y-2 font-mono text-sm">
-                  {[
-                    { m: "GET", p: "/v1/users/:id", s: "200", c: "text-emerald-400" },
-                    { m: "POST", p: "/v1/checkout/session", s: "201", c: "text-emerald-400" },
-                    { m: "PATCH", p: "/v1/orders/:id", s: "204", c: "text-emerald-400" },
-                    { m: "DELETE", p: "/v1/webhooks/:id", s: "404", c: "text-rose-400" },
-                    { m: "GET", p: "/v1/analytics/summary", s: "200", c: "text-emerald-400" },
-                  ].map((e) => (
-                    <div key={e.p} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent/50 transition-colors">
-                      <span className={`text-xs w-14 font-semibold ${e.m === "GET" ? "text-sky-400" : e.m === "POST" ? "text-violet-400" : e.m === "PATCH" ? "text-amber-400" : "text-rose-400"}`}>
-                        {e.m}
-                      </span>
-                      <span className="flex-1 text-foreground/90">{e.p}</span>
-                      <span className={`text-xs ${e.c}`}>{e.s}</span>
+                {/* Mockup Content */}
+                <div className="p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-2">
+                      <div className="h-8 w-48 bg-foreground/10 rounded-md" />
+                      <div className="h-4 w-32 bg-muted/40 rounded-md" />
                     </div>
-                  ))}
+                    <div className="h-8 w-24 bg-primary/20 rounded-full border border-primary/20" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-20 bg-muted/20 rounded-xl border border-border/20" />
+                    ))}
+                  </div>
+                  <div className="space-y-3 pt-4">
+                    <div className="h-4 w-full bg-muted/20 rounded-md" />
+                    <div className="h-4 w-5/6 bg-muted/20 rounded-md" />
+                    <div className="h-4 w-4/6 bg-muted/20 rounded-md" />
+                  </div>
+                  <div className="rounded-xl border border-border/20 bg-background/40 p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="h-5 w-12 bg-blue-500/20 rounded border border-blue-500/30" />
+                      <div className="h-4 w-32 bg-foreground/10 rounded-md" />
+                    </div>
+                    <div className="h-24 w-full bg-[#0d1117] rounded-lg border border-border/40" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -127,19 +134,36 @@ function Hero() {
   );
 }
 
-function LogoStrip() {
-  const logos = ["ACME", "STRIPE", "LINEAR", "VERCEL", "NOTION", "GITHUB"];
+function TrustedFeatures() {
+  const features = [
+    { title: "OpenAPI 3 Support", icon: FileJson, desc: "Full support for the latest OpenAPI 3.x specifications." },
+    { title: "Swagger 2 Support", icon: FileText, desc: "Legacy Swagger 2.0 files are automatically upgraded and parsed." },
+    { title: "AI Generated Docs", icon: Bot, desc: "Intelligent summaries and descriptions generated by advanced LLMs." },
+    { title: "Auth Detection", icon: Shield, desc: "Automatically identifies and documents security schemes." },
+    { title: "Endpoint Explorer", icon: Layout, desc: "Interactive list of all your API paths and methods." },
+    { title: "Markdown Export", icon: Terminal, desc: "Export your documentation to clean, portable Markdown files." },
+    { title: "Fast Processing", icon: Zap, desc: "From upload to production docs in under 15 seconds." },
+    { title: "Responsive Design", icon: Gauge, desc: "Documentation looks perfect on mobile, tablet, and desktop." },
+  ];
+
   return (
-    <section className="border-y border-border/60 bg-background/40">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8">
-        <p className="text-center text-xs uppercase tracking-widest text-muted-foreground mb-6">
-          Trusted by engineers at forward-thinking teams
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4">
-          {logos.map((l) => (
-            <span key={l} className="text-sm font-mono tracking-widest text-muted-foreground/70 hover:text-foreground transition-colors">
-              {l}
-            </span>
+    <section id="features" className="py-24 bg-muted/20">
+      <div className="container px-4 mx-auto">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">Everything you need for production docs</h2>
+          <p className="text-muted-foreground text-lg">Powerful features designed to make API documentation effortless and professional.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {features.map((f, i) => (
+            <Card key={i} className="group bg-card/50 border-border/40 hover:border-primary/30 transition-all duration-300 hover:-translate-y-1">
+              <CardContent className="p-6">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <f.icon className="h-5 w-5" />
+                </div>
+                <h3 className="font-bold mb-2">{f.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>
@@ -147,179 +171,332 @@ function LogoStrip() {
   );
 }
 
-function UploadPlaceholder() {
-  return (
-    <section className="mx-auto max-w-7xl px-4 sm:px-6 py-20">
-      <div className="grid md:grid-cols-2 gap-10 items-center">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/50 px-3 py-1 text-xs text-muted-foreground">
-            <Upload className="h-3 w-3 text-primary" />
-            Import in seconds
-          </div>
-          <h2 className="mt-4 text-3xl sm:text-4xl font-bold tracking-tight">
-            Bring your existing <span className="text-gradient">OpenAPI</span> spec
-          </h2>
-          <p className="mt-4 text-muted-foreground">
-            Drop in an OpenAPI, Postman, or GraphQL schema. APIPilot generates a full test
-            harness, tracks drift, and surfaces breaking changes automatically.
-          </p>
-          <ul className="mt-6 space-y-3">
-            {["Auto-detects breaking changes", "Generates realistic test data", "Works with monorepos"].map((f) => (
-              <li key={f} className="flex items-center gap-2 text-sm">
-                <span className="grid h-5 w-5 place-items-center rounded-full bg-primary/15 text-primary">
-                  <Check className="h-3 w-3" strokeWidth={3} />
-                </span>
-                {f}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="relative">
-          <div className="absolute -inset-2 bg-gradient-brand opacity-20 blur-2xl rounded-3xl" />
-          <div className="relative rounded-xl border border-dashed border-border bg-card/60 backdrop-blur p-10 text-center hover:border-primary/60 transition-colors">
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-brand shadow-glow">
-              <Upload className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <h3 className="mt-4 font-semibold">Drop your spec here</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              OpenAPI 3.x, Postman v2.1, or GraphQL SDL · up to 25 MB
-            </p>
-            <Button className="mt-6 bg-gradient-brand text-primary-foreground hover:opacity-90">
-              Browse files
-            </Button>
-            <p className="mt-3 text-xs text-muted-foreground font-mono">or paste a URL</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Features() {
-  const features = [
-    { icon: Bot, title: "Agentic workflows", desc: "Multi-step AI agents that write, run, and verify integration tests end-to-end." },
-    { icon: Gauge, title: "Real-time insights", desc: "Latency, error rates, and cost broken down by endpoint, region, and consumer." },
-    { icon: GitBranch, title: "PR-aware diffs", desc: "Spot breaking API changes before merge with schema-aware pull request checks." },
-    { icon: Shield, title: "Secure by default", desc: "SOC 2 ready. Private by default with per-workspace encryption keys." },
-    { icon: Zap, title: "Blazingly fast", desc: "Edge-deployed runtime executes suites in milliseconds, close to your users." },
-    { icon: Terminal, title: "CLI + SDKs", desc: "First-class tooling for TypeScript, Go, Python and Rust. CI-native." },
+function HowItWorks() {
+  const steps = [
+    { title: "Upload Specification", desc: "Drag and drop your OpenAPI or Swagger file.", icon: Upload },
+    { title: "AI Processes API", desc: "Our AI analyzes endpoints, parameters, and schemas.", icon: Bot },
+    { title: "Professional Docs Ready", desc: "Instantly browse and share your new documentation.", icon: Check },
   ];
+
   return (
-    <section id="features" className="mx-auto max-w-7xl px-4 sm:px-6 py-24">
-      <div className="max-w-2xl">
-        <p className="text-sm text-primary font-medium">Features</p>
-        <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight">
-          Everything you need to ship APIs with confidence
-        </h2>
-        <p className="mt-3 text-muted-foreground">
-          A minimal, opinionated toolkit designed for the way modern engineering teams
-          actually work.
-        </p>
-      </div>
-
-      <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {features.map((f) => (
-          <div
-            key={f.title}
-            className="group relative rounded-xl border border-border bg-card/60 p-6 shadow-card hover:border-primary/40 hover:-translate-y-0.5 transition-all duration-300"
-          >
-            <div className="absolute inset-0 rounded-xl bg-gradient-brand opacity-0 group-hover:opacity-[0.04] transition-opacity" />
-            <div className="grid h-10 w-10 place-items-center rounded-lg bg-gradient-brand shadow-glow">
-              <f.icon className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <h3 className="mt-4 font-semibold">{f.title}</h3>
-            <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function Pricing() {
-  const tiers = [
-    {
-      name: "Hobby",
-      price: "$0",
-      desc: "For personal projects and side hustles.",
-      features: ["1 workspace", "3 projects", "Community support", "1k runs / month"],
-      cta: "Start free",
-      highlight: false,
-    },
-    {
-      name: "Pro",
-      price: "$24",
-      desc: "For growing teams shipping serious APIs.",
-      features: ["Unlimited projects", "AI agents & insights", "PR checks", "50k runs / month", "Priority support"],
-      cta: "Start 14-day trial",
-      highlight: true,
-    },
-    {
-      name: "Enterprise",
-      price: "Custom",
-      desc: "For platforms with security & compliance needs.",
-      features: ["SSO / SAML", "Dedicated region", "SOC 2 report", "Audit logs", "SLA & DPA"],
-      cta: "Talk to sales",
-      highlight: false,
-    },
-  ];
-  return (
-    <section id="pricing" className="mx-auto max-w-7xl px-4 sm:px-6 py-24">
-      <div className="max-w-2xl mx-auto text-center">
-        <p className="text-sm text-primary font-medium">Pricing</p>
-        <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight">
-          Simple pricing. Serious value.
-        </h2>
-        <p className="mt-3 text-muted-foreground">
-          Start free. Upgrade when your team is ready. No hidden fees, ever.
-        </p>
-      </div>
-
-      <div className="mt-12 grid gap-6 md:grid-cols-3">
-        {tiers.map((t) => (
-          <div
-            key={t.name}
-            className={`relative rounded-2xl border p-8 shadow-card transition-all ${
-              t.highlight
-                ? "border-primary/50 bg-card"
-                : "border-border bg-card/60 hover:border-primary/30"
-            }`}
-          >
-            {t.highlight && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 rounded-full bg-gradient-brand px-3 py-1 text-xs font-medium text-primary-foreground shadow-glow">
-                <Star className="h-3 w-3" /> Most popular
+    <section id="how-it-works" className="py-24 relative overflow-hidden">
+      <div className="container px-4 mx-auto relative z-10">
+        <div className="text-center max-w-3xl mx-auto mb-20">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">How it works</h2>
+          <p className="text-muted-foreground text-lg">Three simple steps to go from a JSON file to professional documentation.</p>
+        </div>
+        <div className="flex flex-col md:flex-row items-center justify-center gap-8 lg:gap-16">
+          {steps.map((s, i) => (
+            <div key={i} className="flex flex-col items-center text-center max-w-[280px] relative">
+              <div className="h-20 w-20 rounded-2xl bg-gradient-brand shadow-glow flex items-center justify-center mb-6 relative z-10">
+                <s.icon className="h-8 w-8 text-primary-foreground" />
+                <div className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-background border-2 border-primary flex items-center justify-center text-xs font-bold text-primary">
+                  {i + 1}
+                </div>
               </div>
-            )}
-            <h3 className="font-semibold">{t.name}</h3>
-            <div className="mt-3 flex items-baseline gap-1">
-              <span className="text-4xl font-bold tracking-tight">{t.price}</span>
-              {t.price !== "Custom" && <span className="text-sm text-muted-foreground">/ mo</span>}
+              <h3 className="text-xl font-bold mb-3">{s.title}</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed">{s.desc}</p>
+              {i < steps.length - 1 && (
+                <div className="hidden md:block absolute top-10 left-[100%] w-full h-px bg-gradient-to-r from-primary/40 to-transparent pointer-events-none" />
+              )}
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">{t.desc}</p>
-            <Button
-              className={`mt-6 w-full ${
-                t.highlight
-                  ? "bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow"
-                  : ""
-              }`}
-              variant={t.highlight ? "default" : "outline"}
-            >
-              {t.cta}
-            </Button>
-            <ul className="mt-6 space-y-3">
-              {t.features.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-sm">
-                  <span className="grid mt-0.5 h-4 w-4 place-items-center rounded-full bg-primary/15 text-primary shrink-0">
-                    <Check className="h-2.5 w-2.5" strokeWidth={3} />
-                  </span>
-                  <span className="text-foreground/90">{f}</span>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DashboardPreview() {
+  return (
+    <section className="py-24 bg-muted/20">
+      <div className="container px-4 mx-auto">
+        <div className="flex flex-col lg:flex-row items-center gap-16">
+          <div className="flex-1 space-y-8 order-2 lg:order-1">
+            <div className="space-y-4">
+              <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Manage all your APIs in one workspace</h2>
+              <p className="text-muted-foreground text-lg">A modern dashboard designed for engineering teams to manage, track, and share documentation.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {[
+                { title: "Fast Upload", icon: Upload, desc: "Quickly import new specs." },
+                { title: "Real-time Status", icon: Activity, desc: "Track generation progress." },
+                { title: "Smart Metadata", icon: FileJson, desc: "Automatic version detection." },
+                { title: "Team Docs", icon: FileText, desc: "Centralized documentation hub." },
+              ].map((f, i) => (
+                <div key={i} className="flex gap-4">
+                  <div className="h-10 w-10 shrink-0 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                    <f.icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm">{f.title}</h4>
+                    <p className="text-xs text-muted-foreground mt-1">{f.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex-1 w-full order-1 lg:order-2">
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-brand opacity-20 blur-2xl rounded-3xl group-hover:opacity-30 transition-opacity" />
+              <div className="relative bg-card border border-border/40 rounded-2xl shadow-2xl overflow-hidden">
+                <div className="p-4 border-b border-border/40 flex items-center justify-between bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-gradient-brand flex items-center justify-center">
+                      <Zap className="h-4 w-4 text-primary-foreground" />
+                    </div>
+                    <span className="font-bold text-sm">Workspace</span>
+                  </div>
+                  <div className="h-8 w-8 rounded-full bg-primary/10 border border-primary/20" />
+                </div>
+                <div className="p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="h-8 w-40 bg-foreground/10 rounded-md" />
+                    <div className="h-10 w-32 bg-primary rounded-md" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[1, 2].map(i => (
+                      <div key={i} className="border border-border/40 rounded-xl p-4 space-y-4">
+                        <div className="flex justify-between">
+                          <div className="h-10 w-10 bg-muted/40 rounded-lg" />
+                          <div className="h-5 w-16 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full" />
+                        </div>
+                        <div className="h-6 w-32 bg-foreground/10 rounded-md" />
+                        <div className="space-y-2">
+                          <div className="h-3 w-full bg-muted/20 rounded-md" />
+                          <div className="h-3 w-4/5 bg-muted/20 rounded-md" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WhyAPIPilot() {
+  return (
+    <section className="py-24">
+      <div className="container px-4 mx-auto">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">Why APIPilot?</h2>
+          <p className="text-muted-foreground text-lg">We solve the problems developers hate about documentation.</p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-center">
+          <div className="space-y-8 bg-destructive/5 border border-destructive/10 rounded-2xl p-8">
+            <h3 className="text-xl font-bold text-destructive flex items-center gap-2">
+              <MousePointer2 className="h-5 w-5 rotate-45" />
+              The Old Way
+            </h3>
+            <ul className="space-y-6">
+              {[
+                { title: "Manual Writing", desc: "Spending hours formatting Markdown and copying examples." },
+                { title: "Outdated Docs", desc: "Documentation falls behind the code within days." },
+                { title: "Inconsistent Style", desc: "Every endpoint looks different, confusing your users." },
+                { title: "Slow Onboarding", desc: "New developers struggle to understand your API surface." },
+              ].map((item, i) => (
+                <li key={i} className="flex gap-4">
+                  <div className="h-6 w-6 shrink-0 rounded-full bg-destructive/10 text-destructive flex items-center justify-center">
+                    <X className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-foreground/80">{item.title}</h4>
+                    <p className="text-sm text-muted-foreground mt-1">{item.desc}</p>
+                  </div>
                 </li>
               ))}
             </ul>
           </div>
-        ))}
+          <div className="space-y-8 bg-primary/5 border border-primary/10 rounded-2xl p-8">
+            <h3 className="text-xl font-bold text-primary flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              The APIPilot Way
+            </h3>
+            <ul className="space-y-6">
+              {[
+                { title: "AI Generated Docs", desc: "Instant, professional documentation with zero manual effort." },
+                { title: "Auto Extraction", desc: "Endpoints, parameters, and schemas parsed automatically." },
+                { title: "Version Tracking", desc: "Keep history of all your API versions in one place." },
+                { title: "Auth Detection", desc: "Security schemes identified and documented for you." },
+              ].map((item, i) => (
+                <li key={i} className="flex gap-4">
+                  <div className="h-6 w-6 shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                    <Check className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-foreground/80">{item.title}</h4>
+                    <p className="text-sm text-muted-foreground mt-1">{item.desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </div>
     </section>
+  );
+}
+
+function DocPreview() {
+  return (
+    <section className="py-24 bg-muted/20 overflow-hidden">
+      <div className="container px-4 mx-auto">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">Beautiful Documentation Center</h2>
+          <p className="text-muted-foreground text-lg">Your users will love browsing your APIs in our clean, responsive interface.</p>
+        </div>
+        <div className="relative">
+          <div className="absolute -inset-1 bg-gradient-brand opacity-10 blur-3xl rounded-3xl" />
+          <div className="relative bg-card border border-border/40 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-[600px]">
+            {/* Sidebar Preview */}
+            <div className="w-full md:w-64 border-b md:border-b-0 md:border-r border-border/40 bg-muted/30 p-6 space-y-6 overflow-y-auto">
+              <div className="h-4 w-24 bg-foreground/10 rounded mb-4" />
+              <div className="space-y-2">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="h-8 w-full bg-muted/40 rounded-md" />
+                ))}
+              </div>
+              <div className="h-px bg-border/40 my-4" />
+              <div className="h-4 w-20 bg-foreground/10 rounded mb-4" />
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                  <div key={i} className="flex gap-2">
+                    <div className="h-4 w-8 bg-blue-500/20 rounded" />
+                    <div className="h-4 w-full bg-muted/40 rounded" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Content Preview */}
+            <div className="flex-1 flex flex-col min-w-0">
+              {/* Toolbar */}
+              <div className="h-14 border-b border-border/40 bg-background/60 px-6 flex items-center justify-between shrink-0">
+                <div className="h-4 w-32 bg-muted/40 rounded" />
+                <div className="flex gap-2">
+                  <div className="h-8 w-24 bg-muted/40 rounded border border-border/40" />
+                  <div className="h-8 w-24 bg-muted/40 rounded border border-border/40" />
+                </div>
+              </div>
+              {/* Main Area */}
+              <div className="flex-1 p-8 space-y-10 overflow-y-auto scrollbar-hide">
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <div className="h-5 w-16 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full" />
+                    <div className="h-5 w-24 bg-muted/40 rounded-full" />
+                  </div>
+                  <div className="h-12 w-3/4 bg-foreground/10 rounded-lg" />
+                  <div className="space-y-2">
+                    <div className="h-4 w-full bg-muted/20 rounded" />
+                    <div className="h-4 w-5/6 bg-muted/20 rounded" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-4">
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="h-16 bg-muted/20 rounded-xl border border-border/20" />
+                  ))}
+                </div>
+                <div className="space-y-4">
+                  <div className="h-8 w-40 bg-foreground/10 rounded-md" />
+                  <div className="border border-border/40 rounded-xl overflow-hidden">
+                    <div className="h-10 bg-muted/30 border-b border-border/40 flex items-center px-4 gap-3">
+                      <div className="h-5 w-12 bg-blue-500/20 rounded" />
+                      <div className="h-4 w-48 bg-foreground/10 rounded" />
+                    </div>
+                    <div className="p-4 space-y-4">
+                      <div className="h-6 w-32 bg-foreground/10 rounded" />
+                      <div className="flex gap-2">
+                        <div className="h-5 w-16 bg-muted/40 rounded-full" />
+                        <div className="h-5 w-16 bg-muted/40 rounded-full" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FAQ() {
+  const faqs = [
+    { q: "What formats are supported?", a: "We support OpenAPI 3.x (JSON/YAML) and Swagger 2.0. Support for Postman collections and GraphQL schemas is coming soon." },
+    { q: "How long does generation take?", a: "Typically under 15 seconds. Our AI processes your spec in real-time to generate summaries, authentication guides, and endpoint descriptions." },
+    { q: "Can I upload private APIs?", a: "Yes. All uploaded specifications are private by default and protected by Supabase Row-Level Security (RLS). Only you can access your data." },
+    { q: "Can I export Markdown?", a: "Absolutely. Every generated documentation page includes a 'Download .md' option so you can host the docs in your own repository or site." },
+    { q: "Is my data secure?", a: "We use enterprise-grade security. All files are stored in encrypted Supabase Storage buckets, and we never use your private API data to train our models." },
+  ];
+
+  return (
+    <section id="faq" className="py-24">
+      <div className="container px-4 mx-auto max-w-3xl">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">Frequently Asked Questions</h2>
+          <p className="text-muted-foreground text-lg">Everything you need to know about APIPilot AI.</p>
+        </div>
+        <Accordion type="single" collapsible className="w-full">
+          {faqs.map((faq, i) => (
+            <AccordionItem key={i} value={`item-${i}`} className="border-border/40">
+              <AccordionTrigger className="text-left font-semibold hover:text-primary transition-colors">
+                {faq.q}
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground leading-relaxed">
+                {faq.a}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </div>
+    </section>
+  );
+}
+
+function FinalCTA() {
+  return (
+    <section className="py-24 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-brand opacity-[0.03]" />
+      <div className="container px-4 mx-auto text-center relative z-10">
+        <div className="max-w-3xl mx-auto space-y-8">
+          <h2 className="text-4xl md:text-5xl font-bold tracking-tight">Ready to document your API?</h2>
+          <p className="text-xl text-muted-foreground">Join developers using APIPilot AI to save hours of manual writing.</p>
+          <div className="pt-4">
+            <Link to="/auth">
+              <Button size="lg" className="h-14 px-10 text-lg bg-gradient-brand text-primary-foreground shadow-glow hover:opacity-90 transition-all font-bold">
+                Start Free
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+          </div>
+          <p className="text-sm text-muted-foreground">No credit card required. Start documenting in seconds.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function X(props: any) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
   );
 }
