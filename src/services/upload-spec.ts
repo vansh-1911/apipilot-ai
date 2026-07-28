@@ -14,7 +14,7 @@ const BUCKET_NAME = "api-specifications";
 export async function uploadApiSpec(
   file: File,
   data: ValidatedSpec,
-  userId: string
+  userId: string,
 ): Promise<UploadResult> {
   const timestamp = Math.floor(Date.now() / 1000);
   const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
@@ -54,12 +54,12 @@ export async function uploadApiSpec(
 
     if (dbError) {
       console.error("Database insert error:", dbError);
-      
+
       // 3. Cleanup: Delete storage object if DB insert fails
       const { error: cleanupError } = await supabase.storage
         .from(BUCKET_NAME)
         .remove([storagePath]);
-      
+
       if (cleanupError) {
         console.error("Failed to cleanup orphaned storage file:", cleanupError);
       }
@@ -69,16 +69,19 @@ export async function uploadApiSpec(
 
     // 4. Trigger Parsing (Client-side for now as per Prompt 3 requirements)
     const specId = specData.id;
-    
+
     // We do this asynchronously to not block the UI response, but the dashboard will see the status change
-    parseAndStoreMetadata(specId, file).catch(err => {
+    parseAndStoreMetadata(specId, file).catch((err) => {
       console.error("Async parsing failed:", err);
     });
 
     return { success: true, specId };
   } catch (error: any) {
     console.error("Unexpected upload error:", error);
-    return { success: false, error: error.message || "An unexpected error occurred during upload." };
+    return {
+      success: false,
+      error: error.message || "An unexpected error occurred during upload.",
+    };
   }
 }
 
@@ -110,7 +113,7 @@ async function parseAndStoreMetadata(specId: string, file: File) {
 
     // Insert endpoints
     if (metadata.endpoints.length > 0) {
-      const endpointsToInsert = metadata.endpoints.map(ep => ({
+      const endpointsToInsert = metadata.endpoints.map((ep) => ({
         spec_id: specId,
         method: ep.method,
         path: ep.path,
@@ -128,16 +131,15 @@ async function parseAndStoreMetadata(specId: string, file: File) {
 
     // 4. Trigger AI Documentation Generation
     await supabase.from("api_specs").update({ status: "processing" }).eq("id", specId); // Re-confirm processing status
-    
+
     const aiResult = await generateDocumentation(specId);
-    
+
     if (aiResult.success) {
       await supabase.from("api_specs").update({ status: "completed" }).eq("id", specId);
     } else {
       console.error("AI Generation failed:", aiResult.error);
       await supabase.from("api_specs").update({ status: "failed" }).eq("id", specId);
     }
-
   } catch (error) {
     console.error("Parsing and storage failed:", error);
     await supabase.from("api_specs").update({ status: "failed" }).eq("id", specId);
