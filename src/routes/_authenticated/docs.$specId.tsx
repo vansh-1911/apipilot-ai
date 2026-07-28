@@ -1,10 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeHighlight from "rehype-highlight";
-import "highlight.js/styles/github-dark.css";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import {
   ArrowLeft,
   Copy,
@@ -61,6 +57,10 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+
+const ReactMarkdown = lazy(() => import("react-markdown"));
+const remarkGfm = import("remark-gfm").then(m => m.default);
+const rehypeHighlight = import("rehype-highlight").then(m => m.default);
 
 export const Route = createFileRoute("/_authenticated/docs/$specId")({
   head: () => ({
@@ -344,7 +344,7 @@ function DocsPage() {
             <div className="md:hidden">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon">
+                  <Button variant="outline" size="icon" aria-label="More actions">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -393,6 +393,7 @@ function DocsPage() {
                 className="h-9 pl-9 text-xs"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search endpoints"
               />
             </div>
           </div>
@@ -733,10 +734,10 @@ function EndpointCard({ endpoint, id }: { endpoint: Endpoint; id: string }) {
           <code className="text-sm font-semibold tracking-tight text-foreground">{endpoint.path}</code>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyPath} title="Copy Path">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyPath} title="Copy Path" aria-label="Copy endpoint path">
             <Copy className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyMarkdown} title="Copy Markdown">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyMarkdown} title="Copy Markdown" aria-label="Copy endpoint markdown">
             <FileJson className="h-4 w-4" />
           </Button>
         </div>
@@ -758,13 +759,24 @@ function EndpointCard({ endpoint, id }: { endpoint: Endpoint; id: string }) {
 }
 
 function Markdown({ content }: { content: string }) {
+  const [plugins, setPlugins] = useState<{ remark: any[]; rehype: any[] }>({ remark: [], rehype: [] });
+
+  useEffect(() => {
+    Promise.all([remarkGfm, rehypeHighlight]).then(([remark, rehype]) => {
+      setPlugins({ remark: [remark], rehype: [rehype] });
+      // Dynamically import CSS only when needed
+      import("highlight.js/styles/github-dark.css");
+    });
+  }, []);
+
   return (
     <div className="prose prose-sm prose-invert max-w-none">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
-        components={{
-          h1: ({ node, ...p }) => <h2 className="mt-8 mb-3 text-2xl font-bold tracking-tight" {...p} />,
+      <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+        <ReactMarkdown
+          remarkPlugins={plugins.remark}
+          rehypePlugins={plugins.rehype}
+          components={{
+            h1: ({ node, ...p }) => <h2 className="mt-8 mb-3 text-2xl font-bold tracking-tight" {...p} />,
           h2: ({ node, ...p }) => <h3 className="mt-6 mb-2 text-xl font-semibold tracking-tight" {...p} />,
           h3: ({ node, ...p }) => <h4 className="mt-5 mb-2 text-lg font-semibold" {...p} />,
           p: ({ node, ...p }) => <p className="mb-4 leading-7 text-foreground/90" {...p} />,
@@ -798,6 +810,7 @@ function Markdown({ content }: { content: string }) {
                     size="icon"
                     className="h-7 w-7 bg-muted/80 backdrop-blur-sm"
                     onClick={copyCode}
+                    aria-label="Copy code snippet"
                   >
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
@@ -823,7 +836,8 @@ function Markdown({ content }: { content: string }) {
         }}
       >
         {content}
-      </ReactMarkdown>
+        </ReactMarkdown>
+      </Suspense>
     </div>
   );
 }

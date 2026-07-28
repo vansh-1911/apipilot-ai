@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import {
   LayoutDashboard,
   Boxes,
@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { formatDistanceToNow } from "date-fns";
-import { UploadModal } from "@/components/upload-modal";
+import { lazy, Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -61,6 +61,8 @@ import { cn } from "@/lib/utils";
 import { deleteApiSpec } from "@/services/delete-spec";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+
+const UploadModal = lazy(() => import("@/components/upload-modal").then(m => ({ default: m.UploadModal })));
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -149,10 +151,10 @@ function Dashboard() {
     return result;
   }, [specs, searchQuery, sortBy]);
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     await signOut();
     navigate({ to: "/auth", replace: true });
-  };
+  }, [signOut, navigate]);
 
   const initials = (user?.user_metadata?.full_name || user?.email || "?")
     .split(/[\s@]/)
@@ -210,6 +212,7 @@ function Dashboard() {
                 className="pl-10 bg-muted/40 border-border/40 focus:bg-background transition-all"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search specifications"
               />
             </div>
             <div className="ml-auto flex items-center gap-3">
@@ -265,7 +268,7 @@ function Dashboard() {
             </div>
           ) : isError ? (
             <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center space-y-3">
-              <AlertTriangle className="h-8 w-8 text-destructive mx-auto" />
+              <AlertTriangleIcon className="h-8 w-8 text-destructive mx-auto" />
               <p className="text-sm font-medium text-destructive">
                 Couldn't load your specifications: {(error as Error).message}
               </p>
@@ -288,15 +291,17 @@ function Dashboard() {
         </main>
       </div>
 
-      <UploadModal 
-        open={uploadModalOpen} 
-        onOpenChange={setUploadModalOpen} 
-      />
+      <Suspense fallback={null}>
+        <UploadModal 
+          open={uploadModalOpen} 
+          onOpenChange={setUploadModalOpen} 
+        />
+      </Suspense>
     </div>
   );
 }
 
-function SpecCard({ spec }: { spec: ApiSpec }) {
+const SpecCard = memo(function SpecCard({ spec }: { spec: ApiSpec }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -348,7 +353,7 @@ function SpecCard({ spec }: { spec: ApiSpec }) {
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" aria-label="More options">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -444,48 +449,49 @@ function SpecCard({ spec }: { spec: ApiSpec }) {
           </Button>
         )}
       </CardFooter>
-    </Card>
 
-    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete API Specification?</AlertDialogTitle>
-          <AlertDialogDescription className="space-y-3">
-            <p>This action cannot be undone.</p>
-            <p className="font-medium text-foreground">The following will be permanently deleted:</p>
-            <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Uploaded specification</li>
-              <li>Parsed endpoints</li>
-              <li>AI generated documentation</li>
-              <li>Dashboard entry</li>
-            </ul>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-          <AlertDialogAction 
-            onClick={(e) => {
-              e.preventDefault();
-              handleDelete();
-            }}
-            disabled={isDeleting}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            {isDeleting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Deleting...
-              </>
-            ) : (
-              "Delete Specification"
-            )}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete API Specification?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>This action cannot be undone.</p>
+              <p className="font-medium text-foreground">The following will be permanently deleted:</p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>Uploaded specification</li>
+                <li>Parsed endpoints</li>
+                <li>AI generated documentation</li>
+                <li>Dashboard entry</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Specification"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
     </>
   );
-}
+});
 
 function EmptyState({ onUploadClick, isSearch }: { onUploadClick: () => void; isSearch: boolean }) {
   return (

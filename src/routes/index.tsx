@@ -74,12 +74,12 @@ function Hero() {
               Upload any OpenAPI or Swagger specification and receive production-ready API documentation in seconds. Stop writing docs manually.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-              <Link to="/auth">
-                <Button size="lg" className="h-12 px-8 bg-gradient-brand text-primary-foreground shadow-glow hover:opacity-90 transition-all font-semibold">
+              <Button size="lg" className="h-12 px-8 bg-gradient-brand text-primary-foreground shadow-glow hover:opacity-90 transition-all font-semibold" asChild>
+                <Link to="/auth">
                   Get Started
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
+                </Link>
+              </Button>
               <Button size="lg" variant="outline" className="h-12 px-8 border-border/60 hover:bg-accent/50 transition-all font-semibold">
                 View Demo
               </Button>
@@ -91,11 +91,11 @@ function Hero() {
               <div className="relative bg-card/40 backdrop-blur-xl border border-border/40 rounded-2xl shadow-2xl overflow-hidden aspect-[4/3]">
                 {/* Mockup Header */}
                 <div className="flex items-center gap-1.5 px-4 py-3 border-b border-border/40 bg-background/40">
-                  <div className="flex gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
-                  </div>
+            <div className="flex gap-1.5" aria-hidden="true">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
+            </div>
                   <div className="mx-auto text-[10px] font-mono text-muted-foreground/60">apipilot.ai / documentation / stripe-v3</div>
                 </div>
                 {/* Mockup Content */}
