@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { uploadApiSpec } from "@/services/upload-spec";
 import { useAuth } from "@/hooks/use-auth";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { Loader2, ArrowLeft, Github, Archive, Send } from "lucide-react";
 import { SourceSelector } from "./source-selector";
 import { SourceType } from "@/types/source";
@@ -37,6 +38,7 @@ const ERROR_MESSAGES: Record<ValidationError, string> = {
 export function UploadModal({ open, onOpenChange }: UploadModalProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [selectedSource, setSelectedSource] = useState<SourceType | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [validatedData, setValidatedData] = useState<ValidatedSpec | null>(null);
