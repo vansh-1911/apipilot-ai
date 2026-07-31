@@ -474,13 +474,8 @@ const SpecCard = memo(function SpecCard({
       <Card className="group border-border/40 bg-card/40 backdrop-blur-sm hover:shadow-2xl hover:shadow-primary/5 hover:border-primary/30 transition-all duration-500 overflow-hidden flex flex-col relative rounded-2xl">
         <CardHeader className="pb-4">
           <div className="flex justify-between items-start gap-2">
-<<<<<<< HEAD
-            <div className="p-2.5 rounded-xl bg-primary/5 text-primary border border-primary/10 group-hover:scale-110 group-hover:bg-primary/10 transition-all duration-500">
-              <FileJson className="h-6 w-6" />
-=======
             <div className={cn("p-2 rounded-lg border border-border/10 group-hover:scale-110 transition-transform duration-300", source.color)}>
               <source.icon className="h-5 w-5" />
->>>>>>> 8040178 (feat: implement repository intelligence foundation (Sprint 11A))
             </div>
             <div className="flex items-center gap-1.5">
               <Button
