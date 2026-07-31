@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState, useMemo, useCallback, memo } from "react";
+import { useState, useMemo, useCallback, memo, useEffect } from "react";
 import {
   LayoutDashboard,
   Boxes,
@@ -26,6 +26,11 @@ import {
   Check,
   AlertTriangle as AlertTriangleIcon,
   Trash2,
+  Star,
+  StarOff,
+  History,
+  Menu,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +39,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { formatDistanceToNow } from "date-fns";
 import { lazy, Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -41,6 +47,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   Tooltip,
   TooltipContent,
@@ -109,6 +120,26 @@ function Dashboard() {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Load favorites and recent from localStorage
+  useEffect(() => {
+    const savedFavs = localStorage.getItem("apipilot_favorites");
+    if (savedFavs) setFavorites(JSON.parse(savedFavs));
+
+    const savedRecent = localStorage.getItem("apipilot_recent");
+    if (savedRecent) setRecentIds(JSON.parse(savedRecent));
+  }, []);
+
+  const toggleFavorite = useCallback((id: string) => {
+    setFavorites((prev) => {
+      const next = prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id];
+      localStorage.setItem("apipilot_favorites", JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   const {
     data: specs,
@@ -128,11 +159,36 @@ function Dashboard() {
     },
   });
 
+  const stats = useMemo(() => {
+    if (!specs) return { total: 0, endpoints: 0, completed: 0, processing: 0, failed: 0 };
+    return {
+      total: specs.length,
+      endpoints: specs.reduce((acc, s) => acc + (s.endpoint_count || 0), 0),
+      completed: specs.filter(s => s.status === "completed").length,
+      processing: specs.filter(s => s.status === "processing").length,
+      failed: specs.filter(s => s.status === "failed").length,
+    };
+  }, [specs]);
+
+  const favoriteSpecs = useMemo(() => {
+    if (!specs) return [];
+    return specs.filter(s => favorites.includes(s.id));
+  }, [specs, favorites]);
+
+  const recentSpecs = useMemo(() => {
+    if (!specs) return [];
+    return recentIds
+      .map(id => specs.find(s => s.id === id))
+      .filter((s): s is ApiSpec => !!s);
+  }, [specs, recentIds]);
+
   const filteredAndSortedSpecs = useMemo(() => {
     if (!specs) return [];
     
     let result = specs.filter((s) => 
-      s.name.toLowerCase().includes(searchQuery.toLowerCase())
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (s.description?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
+      (s.api_version?.toLowerCase() || "").includes(searchQuery.toLowerCase())
     );
 
     switch (sortBy) {
@@ -165,57 +221,38 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen flex bg-background/50">
+      {/* Desktop Sidebar */}
       <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-border/40 bg-card/30 backdrop-blur-sm">
-        <Link to="/" className="flex items-center gap-2 px-6 h-16 border-b border-border/40">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-brand shadow-glow">
-            <Zap className="h-4 w-4 text-primary-foreground" strokeWidth={2.5} />
-          </span>
-          <span className="font-bold tracking-tight text-lg">APIPilot</span>
-        </Link>
-        <nav className="flex-1 p-4 space-y-1">
-          <p className="px-3 pt-4 pb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
-            Workspace
-          </p>
-          {nav.map((n) => (
-            <button
-              key={n.label}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                n.active
-                  ? "bg-primary/10 text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
-              )}
-            >
-              <n.icon className="h-4 w-4" />
-              {n.label}
-            </button>
-          ))}
-        </nav>
-        <div className="p-4 border-t border-border/40">
-          <button
-            onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all duration-200"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </button>
-        </div>
+        <SidebarContent onSignOut={handleSignOut} />
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="h-16 border-b border-border/40 bg-background/60 backdrop-blur-md sticky top-0 z-40">
           <div className="h-full px-4 sm:px-8 flex items-center gap-4">
+            {/* Mobile Menu Trigger */}
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="lg:hidden">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Toggle menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-64 bg-background border-r border-border/40">
+                <SidebarContent onSignOut={handleSignOut} onNavItemClick={() => setIsMobileMenuOpen(false)} />
+              </SheetContent>
+            </Sheet>
+
             <div className="relative flex-1 max-w-xl">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
               <Input 
-                placeholder="Search specifications by title…" 
-                className="pl-10 bg-muted/40 border-border/40 focus:bg-background transition-all"
+                placeholder="Search specifications…" 
+                className="pl-10 bg-muted/40 border-border/40 focus:bg-background transition-all rounded-xl h-10"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Search specifications"
               />
             </div>
-            <div className="ml-auto flex items-center gap-3">
+            <div className="ml-auto flex items-center gap-2 sm:gap-3">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="hidden sm:flex gap-2 border-border/40">
@@ -242,11 +279,11 @@ function Dashboard() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-8 space-y-8">
+        <main className="flex-1 p-4 sm:p-8 space-y-10">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-primary">Welcome back</p>
-              <h1 className="text-3xl font-bold tracking-tight">Your API specifications</h1>
+              <p className="text-sm font-medium text-primary">Workspace Overview</p>
+              <h1 className="text-3xl font-bold tracking-tight">Developer Dashboard</h1>
             </div>
             <Button 
               className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow h-11 px-6 font-semibold"
@@ -257,35 +294,111 @@ function Dashboard() {
             </Button>
           </div>
 
+          {/* Stats Panel */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <StatCard label="Total APIs" value={stats.total} icon={Boxes} />
+            <StatCard label="Endpoints" value={stats.endpoints} icon={Hash} />
+            <StatCard label="Generated" value={stats.completed} icon={Check} color="text-emerald-500" />
+            <StatCard label="Processing" value={stats.processing} icon={Loader2} color="text-blue-500" loading={stats.processing > 0} />
+            <StatCard label="Failed" value={stats.failed} icon={AlertTriangleIcon} color="text-rose-500" />
+          </div>
+
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="animate-pulse border-border/40">
-                  <CardHeader className="h-32 bg-muted/20" />
-                  <CardContent className="h-24" />
-                </Card>
-              ))}
+            <div className="space-y-10">
+              <div className="space-y-4">
+                <Skeleton className="h-8 w-48" />
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-64 rounded-xl" />)}
+                </div>
+              </div>
             </div>
           ) : isError ? (
-            <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center space-y-3">
-              <AlertTriangleIcon className="h-8 w-8 text-destructive mx-auto" />
-              <p className="text-sm font-medium text-destructive">
-                Couldn't load your specifications: {(error as Error).message}
-              </p>
-              <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-                Try again
+            <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-12 text-center space-y-4 max-w-2xl mx-auto">
+              <div className="h-16 w-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
+                <AlertTriangleIcon className="h-8 w-8 text-destructive" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold">Failed to load specifications</h3>
+                <p className="text-muted-foreground text-sm">
+                  {(error as Error).message || "An unexpected error occurred while fetching your data."}
+                </p>
+              </div>
+              <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Retry Connection
               </Button>
             </div>
-          ) : filteredAndSortedSpecs.length === 0 ? (
-            <EmptyState 
-              onUploadClick={() => setUploadModalOpen(true)} 
-              isSearch={searchQuery.length > 0} 
-            />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in duration-700">
-              {filteredAndSortedSpecs.map((s) => (
-                <SpecCard key={s.id} spec={s} />
-              ))}
+            <div className="space-y-12">
+              {/* Favorites Section */}
+              {favoriteSpecs.length > 0 && !searchQuery && (
+                <section className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="flex items-center gap-2 px-1">
+                    <Star className="h-5 w-5 text-yellow-500 fill-current" />
+                    <h2 className="text-xl font-bold tracking-tight">Favorites</h2>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {favoriteSpecs.map((s) => (
+                      <SpecCard 
+                        key={s.id} 
+                        spec={s} 
+                        isFavorite={true}
+                        onToggleFavorite={() => toggleFavorite(s.id)}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Recent Section */}
+              {recentSpecs.length > 0 && !searchQuery && (
+                <section className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                  <div className="flex items-center gap-2 px-1">
+                    <History className="h-5 w-5 text-primary" />
+                    <h2 className="text-xl font-bold tracking-tight">Recently Viewed</h2>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {recentSpecs.map((s) => (
+                      <SpecCard 
+                        key={s.id} 
+                        spec={s} 
+                        isFavorite={favorites.includes(s.id)}
+                        onToggleFavorite={() => toggleFavorite(s.id)}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* All Specifications */}
+              <section className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-2">
+                    <Boxes className="h-5 w-5 text-muted-foreground" />
+                    <h2 className="text-xl font-bold tracking-tight">
+                      {searchQuery ? `Search Results (${filteredAndSortedSpecs.length})` : "All Specifications"}
+                    </h2>
+                  </div>
+                </div>
+
+                {filteredAndSortedSpecs.length === 0 ? (
+                  <EmptyState 
+                    onUploadClick={() => setUploadModalOpen(true)} 
+                    isSearch={searchQuery.length > 0} 
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in duration-1000">
+                    {filteredAndSortedSpecs.map((s) => (
+                      <SpecCard 
+                        key={s.id} 
+                        spec={s} 
+                        isFavorite={favorites.includes(s.id)}
+                        onToggleFavorite={() => toggleFavorite(s.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
             </div>
           )}
         </main>
@@ -301,7 +414,15 @@ function Dashboard() {
   );
 }
 
-const SpecCard = memo(function SpecCard({ spec }: { spec: ApiSpec }) {
+const SpecCard = memo(function SpecCard({ 
+  spec, 
+  isFavorite, 
+  onToggleFavorite 
+}: { 
+  spec: ApiSpec; 
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -336,30 +457,38 @@ const SpecCard = memo(function SpecCard({ spec }: { spec: ApiSpec }) {
 
   return (
     <>
-      <Card className="group border-border/40 bg-card/40 backdrop-blur-sm hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 transition-all duration-300 overflow-hidden flex flex-col relative">
-        <CardHeader className="pb-3">
+      <Card className="group border-border/40 bg-card/40 backdrop-blur-sm hover:shadow-2xl hover:shadow-primary/5 hover:border-primary/30 transition-all duration-500 overflow-hidden flex flex-col relative rounded-2xl">
+        <CardHeader className="pb-4">
           <div className="flex justify-between items-start gap-2">
-            <div className="p-2 rounded-lg bg-primary/5 text-primary border border-primary/10 group-hover:scale-110 transition-transform duration-300">
-              <FileJson className="h-5 w-5" />
+            <div className="p-2.5 rounded-xl bg-primary/5 text-primary border border-primary/10 group-hover:scale-110 group-hover:bg-primary/10 transition-all duration-500">
+              <FileJson className="h-6 w-6" />
             </div>
-            <div className="flex items-center gap-2">
-              <Badge 
-                variant="outline" 
-                className={cn("text-[10px] uppercase tracking-wider font-bold py-0.5 px-2 flex items-center gap-1.5", config.color)}
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-8 w-8 rounded-full transition-all duration-300",
+                  isFavorite ? "text-yellow-500 bg-yellow-500/10" : "text-muted-foreground/40 hover:text-yellow-500 hover:bg-yellow-500/10"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite();
+                }}
+                aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
               >
-                {spec.status === "processing" && <config.icon className="h-3 w-3 animate-spin" />}
-                {config.label}
-              </Badge>
-              
+                <Star className={cn("h-4 w-4", isFavorite && "fill-current")} />
+              </Button>
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" aria-label="More options">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground/40 hover:text-foreground hover:bg-accent transition-all duration-300" aria-label="More options">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-48 rounded-xl p-1">
                   <DropdownMenuItem 
-                    className="text-destructive focus:text-destructive gap-2"
+                    className="text-destructive focus:text-destructive focus:bg-destructive/10 gap-2 rounded-lg cursor-pointer"
                     onClick={() => setDeleteDialogOpen(true)}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -369,83 +498,94 @@ const SpecCard = memo(function SpecCard({ spec }: { spec: ApiSpec }) {
               </DropdownMenu>
             </div>
           </div>
-          <CardTitle className="text-xl mt-4 line-clamp-1 group-hover:text-primary transition-colors">
-            {spec.name}
-          </CardTitle>
-          <p className="text-xs text-muted-foreground/60 font-mono truncate">
-            {spec.file_name}
-          </p>
+          <div className="space-y-1.5 mt-4">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-xl line-clamp-1 group-hover:text-primary transition-colors duration-300">
+                {spec.name}
+              </CardTitle>
+              <Badge 
+                variant="outline" 
+                className={cn("text-[9px] uppercase tracking-widest font-bold py-0 px-2 h-5 flex items-center gap-1 rounded-full", config.color)}
+              >
+                {spec.status === "processing" && <config.icon className="h-2.5 w-2.5 animate-spin" />}
+                {config.label}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground/50 font-mono truncate">
+              {spec.file_name}
+            </p>
+          </div>
         </CardHeader>
       
-      <CardContent className="pb-6 flex-1">
-        <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem] mb-6">
+      <CardContent className="pb-6 flex-1 space-y-6">
+        <p className="text-sm text-muted-foreground/80 line-clamp-2 min-h-[2.5rem] leading-relaxed">
           {spec.description || "No description provided for this API specification."}
         </p>
         
-        <div className="grid grid-cols-2 gap-y-4 gap-x-2">
+        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border/20">
           <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/50">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-muted-foreground/40">
               <Hash className="h-3 w-3" /> Endpoints
             </div>
-            <p className="text-sm font-semibold">{spec.endpoint_count}</p>
+            <p className="text-sm font-bold">{spec.endpoint_count}</p>
           </div>
-          <div className="space-y-1 text-right sm:text-left">
-            <div className="flex items-center justify-end sm:justify-start gap-1.5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/50">
+          <div className="space-y-1 text-right">
+            <div className="flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-widest font-bold text-muted-foreground/40">
               <Shield className="h-3 w-3" /> Auth
             </div>
-            <p className="text-sm font-semibold truncate">{spec.auth_type || "None"}</p>
+            <p className="text-sm font-bold truncate">{spec.auth_type || "None"}</p>
           </div>
           <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/50">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-muted-foreground/40">
               <Zap className="h-3 w-3" /> Version
             </div>
-            <p className="text-sm font-semibold">{spec.api_version || "N/A"}</p>
+            <p className="text-sm font-bold">{spec.api_version || "N/A"}</p>
           </div>
-          <div className="space-y-1 text-right sm:text-left">
-            <div className="flex items-center justify-end sm:justify-start gap-1.5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/50">
+          <div className="space-y-1 text-right">
+            <div className="flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-widest font-bold text-muted-foreground/40">
               <Calendar className="h-3 w-3" /> Uploaded
             </div>
-            <p className="text-sm font-semibold">
+            <p className="text-sm font-bold whitespace-nowrap">
               {formatDistanceToNow(new Date(spec.created_at), { addSuffix: true })}
             </p>
           </div>
         </div>
       </CardContent>
 
-      <CardFooter className="pt-0 pb-6">
+      <CardFooter className="pt-0 pb-6 px-6">
         {spec.status === "completed" ? (
           <Button 
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-sm group/btn"
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow-sm h-11 rounded-xl group/btn transition-all duration-300"
             onClick={() => navigate({ to: `/docs/${spec.id}` })}
             disabled={isDeleting}
           >
             View Documentation
-            <ExternalLink className="ml-2 h-4 w-4 opacity-50 group-hover/btn:opacity-100 transition-opacity" />
+            <ExternalLink className="ml-2 h-4 w-4 opacity-50 group-hover/btn:translate-x-0.5 group-hover/btn:translate-y--0.5 transition-transform" />
           </Button>
         ) : spec.status === "processing" ? (
-          <Button disabled className="w-full font-semibold">
+          <Button disabled className="w-full font-bold h-11 rounded-xl bg-muted/50">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Generating...
+            Processing Docs...
           </Button>
         ) : spec.status === "failed" ? (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="w-full">
-                  <Button disabled variant="outline" className="w-full font-semibold border-destructive/20 text-destructive/60">
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Retry Generation
+                  <Button disabled variant="outline" className="w-full font-bold h-11 rounded-xl border-destructive/20 text-destructive/60">
+                    <AlertTriangleIcon className="mr-2 h-4 w-4" />
+                    Generation Failed
                   </Button>
                 </div>
               </TooltipTrigger>
-              <TooltipContent>
-                <p>Coming in the next update.</p>
+              <TooltipContent className="bg-destructive text-destructive-foreground border-none rounded-lg p-2">
+                <p className="text-xs font-medium">Please try re-uploading the specification.</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         ) : (
-          <Button disabled variant="outline" className="w-full font-semibold">
-            Awaiting Processing
+          <Button disabled variant="outline" className="w-full font-bold h-11 rounded-xl">
+            Awaiting AI...
           </Button>
         )}
       </CardFooter>
@@ -495,26 +635,103 @@ const SpecCard = memo(function SpecCard({ spec }: { spec: ApiSpec }) {
 
 function EmptyState({ onUploadClick, isSearch }: { onUploadClick: () => void; isSearch: boolean }) {
   return (
-    <div className="rounded-2xl border-2 border-dashed border-border/40 bg-card/20 p-16 text-center animate-in zoom-in-95 duration-500">
-      <div className="mx-auto grid h-20 w-20 place-items-center rounded-2xl bg-gradient-brand shadow-glow mb-6">
-        <Sparkles className="h-10 w-10 text-primary-foreground" />
+    <div className="rounded-3xl border-2 border-dashed border-border/40 bg-card/20 p-12 md:p-20 text-center animate-in zoom-in-95 duration-500 max-w-3xl mx-auto w-full">
+      <div className="mx-auto grid h-24 w-24 place-items-center rounded-3xl bg-gradient-brand shadow-glow mb-8 group-hover:scale-110 transition-transform duration-500">
+        {isSearch ? (
+          <Search className="h-12 w-12 text-primary-foreground" />
+        ) : (
+          <Sparkles className="h-12 w-12 text-primary-foreground" />
+        )}
       </div>
-      <h3 className="text-2xl font-bold tracking-tight mb-2">
-        {isSearch ? "No matching specifications found" : "No API Specifications Yet"}
-      </h3>
-      <p className="text-muted-foreground max-w-md mx-auto mb-8">
-        {isSearch 
-          ? "Try adjusting your search query to find what you're looking for." 
-          : "Upload an OpenAPI or Swagger specification to automatically generate professional AI-powered documentation."}
-      </p>
-      <Button 
-        className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow h-12 px-8 font-bold"
-        onClick={onUploadClick}
-      >
-        <Upload className="mr-2 h-4 w-4" />
-        {isSearch ? "Upload New Specification" : "Upload API Specification"}
-      </Button>
+      <div className="space-y-3 mb-10">
+        <h3 className="text-3xl font-bold tracking-tight">
+          {isSearch ? "No matching APIs found" : "Your workspace is empty"}
+        </h3>
+        <p className="text-muted-foreground text-lg max-w-md mx-auto leading-relaxed">
+          {isSearch 
+            ? "We couldn't find any specifications matching your search. Try a different keyword or clear the search." 
+            : "Get started by uploading your first OpenAPI specification. We'll handle the rest and generate professional documentation for you."}
+        </p>
+      </div>
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <Button 
+          className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow h-14 px-10 font-bold text-lg rounded-xl w-full sm:w-auto"
+          onClick={onUploadClick}
+        >
+          <Upload className="mr-2 h-5 w-5" />
+          {isSearch ? "Upload New Spec" : "Create First API"}
+        </Button>
+        {isSearch && (
+          <Button variant="outline" className="h-14 px-10 font-bold text-lg rounded-xl w-full sm:w-auto border-border/60">
+            Clear Search
+          </Button>
+        )}
+      </div>
     </div>
+  );
+}
+
+function SidebarContent({ onSignOut, onNavItemClick }: { onSignOut: () => void; onNavItemClick?: () => void }) {
+  return (
+    <div className="flex flex-col h-full">
+      <Link to="/" className="flex items-center gap-2 px-6 h-16 border-b border-border/40" onClick={onNavItemClick}>
+        <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-brand shadow-glow">
+          <Zap className="h-4 w-4 text-primary-foreground" strokeWidth={2.5} />
+        </span>
+        <span className="font-bold tracking-tight text-lg">APIPilot</span>
+      </Link>
+      <nav className="flex-1 p-4 space-y-1">
+        <p className="px-3 pt-4 pb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+          Workspace
+        </p>
+        {nav.map((n) => (
+          <button
+            key={n.label}
+            onClick={onNavItemClick}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+              n.active
+                ? "bg-primary/10 text-primary shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
+            )}
+          >
+            <n.icon className="h-4 w-4" />
+            {n.label}
+          </button>
+        ))}
+      </nav>
+      <div className="p-4 border-t border-border/40">
+        <button
+          onClick={() => {
+            onSignOut();
+            onNavItemClick?.();
+          }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all duration-200"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, icon: Icon, color, loading }: { label: string; value: number; icon: any; color?: string; loading?: boolean }) {
+  return (
+    <Card className="border-border/40 bg-card/40 backdrop-blur-sm overflow-hidden relative group hover:border-primary/20 transition-all duration-300">
+      <CardContent className="p-4 flex items-center gap-4">
+        <div className={cn(
+          "h-10 w-10 rounded-xl flex items-center justify-center bg-muted/50 transition-colors duration-300 group-hover:bg-primary/10",
+          color?.replace("text-", "bg-")?.replace("500", "500/10")
+        )}>
+          <Icon className={cn("h-5 w-5", color || "text-muted-foreground", loading && "animate-spin")} />
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">{label}</p>
+          <p className="text-xl font-bold tabular-nums">{value}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

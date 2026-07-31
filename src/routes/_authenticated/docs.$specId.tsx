@@ -182,6 +182,23 @@ function DocsPage() {
   );
 
   useEffect(() => {
+    if (!data?.spec) return;
+    
+    // Add to recent APIs
+    const savedRecent = localStorage.getItem("apipilot_recent");
+    let recent: string[] = savedRecent ? JSON.parse(savedRecent) : [];
+    
+    // Remove if already exists to move to top
+    recent = recent.filter(id => id !== data.spec.id);
+    // Add to top
+    recent.unshift(data.spec.id);
+    // Limit to 5
+    recent = recent.slice(0, 5);
+    
+    localStorage.setItem("apipilot_recent", JSON.stringify(recent));
+  }, [data?.spec]);
+
+  useEffect(() => {
     if (!data?.doc) return;
     const ids = [
       ...sections.map((s) => s.id),
