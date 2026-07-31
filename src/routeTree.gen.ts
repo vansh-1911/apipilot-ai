@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedRepositoryAnalyzeRouteImport } from './routes/_authenticated/repository/analyze'
 import { Route as AuthenticatedDocsSpecIdRouteImport } from './routes/_authenticated/docs.$specId'
 import { Route as AuthenticatedChatSpecIdRouteImport } from './routes/_authenticated/chat.$specId'
 
@@ -35,6 +36,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedRepositoryAnalyzeRoute =
+  AuthenticatedRepositoryAnalyzeRouteImport.update({
+    id: '/repository/analyze',
+    path: '/repository/analyze',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDocsSpecIdRoute = AuthenticatedDocsSpecIdRouteImport.update({
   id: '/docs/$specId',
   path: '/docs/$specId',
@@ -52,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/chat/$specId': typeof AuthenticatedChatSpecIdRoute
   '/docs/$specId': typeof AuthenticatedDocsSpecIdRoute
+  '/repository/analyze': typeof AuthenticatedRepositoryAnalyzeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -59,6 +67,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/chat/$specId': typeof AuthenticatedChatSpecIdRoute
   '/docs/$specId': typeof AuthenticatedDocsSpecIdRoute
+  '/repository/analyze': typeof AuthenticatedRepositoryAnalyzeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -68,12 +77,25 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/chat/$specId': typeof AuthenticatedChatSpecIdRoute
   '/_authenticated/docs/$specId': typeof AuthenticatedDocsSpecIdRoute
+  '/_authenticated/repository/analyze': typeof AuthenticatedRepositoryAnalyzeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/dashboard' | '/chat/$specId' | '/docs/$specId'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/chat/$specId'
+    | '/docs/$specId'
+    | '/repository/analyze'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/dashboard' | '/chat/$specId' | '/docs/$specId'
+  to:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/chat/$specId'
+    | '/docs/$specId'
+    | '/repository/analyze'
   id:
     | '__root__'
     | '/'
@@ -82,6 +104,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/chat/$specId'
     | '/_authenticated/docs/$specId'
+    | '/_authenticated/repository/analyze'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -120,6 +143,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/repository/analyze': {
+      id: '/_authenticated/repository/analyze'
+      path: '/repository/analyze'
+      fullPath: '/repository/analyze'
+      preLoaderRoute: typeof AuthenticatedRepositoryAnalyzeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/docs/$specId': {
       id: '/_authenticated/docs/$specId'
       path: '/docs/$specId'
@@ -141,12 +171,14 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedChatSpecIdRoute: typeof AuthenticatedChatSpecIdRoute
   AuthenticatedDocsSpecIdRoute: typeof AuthenticatedDocsSpecIdRoute
+  AuthenticatedRepositoryAnalyzeRoute: typeof AuthenticatedRepositoryAnalyzeRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedChatSpecIdRoute: AuthenticatedChatSpecIdRoute,
   AuthenticatedDocsSpecIdRoute: AuthenticatedDocsSpecIdRoute,
+  AuthenticatedRepositoryAnalyzeRoute: AuthenticatedRepositoryAnalyzeRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
