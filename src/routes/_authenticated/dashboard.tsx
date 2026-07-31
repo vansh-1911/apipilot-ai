@@ -554,14 +554,25 @@ const SpecCard = memo(function SpecCard({
 
       <CardFooter className="pt-0 pb-6 px-6">
         {spec.status === "completed" ? (
-          <Button 
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow-sm h-11 rounded-xl group/btn transition-all duration-300"
-            onClick={() => navigate({ to: `/docs/${spec.id}` })}
-            disabled={isDeleting}
-          >
-            View Documentation
-            <ExternalLink className="ml-2 h-4 w-4 opacity-50 group-hover/btn:translate-x-0.5 group-hover/btn:translate-y--0.5 transition-transform" />
-          </Button>
+          <div className="flex w-full gap-2">
+            <Button 
+              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow-sm h-11 rounded-xl group/btn transition-all duration-300"
+              onClick={() => navigate({ to: `/docs/${spec.id}` })}
+              disabled={isDeleting}
+            >
+              View Docs
+              <ExternalLink className="ml-2 h-4 w-4 opacity-50 group-hover/btn:translate-x-0.5 group-hover/btn:translate-y--0.5 transition-transform" />
+            </Button>
+            <Button
+              variant="outline"
+              className="px-3 border-border/60 hover:bg-primary/5 hover:text-primary hover:border-primary/30 h-11 rounded-xl transition-all duration-300"
+              onClick={() => navigate({ to: `/chat/${spec.id}` })}
+              disabled={isDeleting}
+              title="Ask AI Assistant"
+            >
+              <Sparkles className="h-4 w-4" />
+            </Button>
+          </div>
         ) : spec.status === "processing" ? (
           <Button disabled className="w-full font-bold h-11 rounded-xl bg-muted/50">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

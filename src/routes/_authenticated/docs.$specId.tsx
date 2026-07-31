@@ -24,6 +24,7 @@ import {
   Lock,
   Printer,
   MoreHorizontal,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -317,6 +318,15 @@ function DocsPage() {
           </Button>
           <div className="flex items-center gap-2">
             <div className="hidden items-center gap-2 md:flex">
+              <Button
+                className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow-sm border-none gap-2"
+                size="sm"
+                onClick={() => navigate({ to: `/chat/${specId}` })}
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>Ask AI</span>
+              </Button>
+              <Separator orientation="vertical" className="h-6 mx-1" />
               <Button variant="outline" size="sm" onClick={copyMarkdown} disabled={!fullMarkdown} className="gap-2">
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 <span>Copy Markdown</span>
@@ -366,6 +376,11 @@ function DocsPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => navigate({ to: `/chat/${specId}` })} className="gap-2 text-primary focus:text-primary">
+                    <Sparkles className="h-4 w-4" />
+                    <span>Ask AI Assistant</span>
+                  </DropdownMenuItem>
+                  <Separator className="my-1" />
                   <DropdownMenuItem onClick={copyMarkdown} disabled={!fullMarkdown} className="gap-2">
                     <Copy className="h-4 w-4" />
                     <span>Copy Markdown</span>
