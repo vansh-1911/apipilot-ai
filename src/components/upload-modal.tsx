@@ -161,7 +161,19 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
               />
             )
           ) : (
-            <SourcePlaceholder type={selectedSource} />
+            <SourcePlaceholder
+              type={selectedSource}
+              onStart={(source, value) => {
+                resetAndClose(false);
+                navigate({
+                  to: "/repository/analyze",
+                  search:
+                    source === "github"
+                      ? { source, repo: value }
+                      : { source, file: value },
+                });
+              }}
+            />
           )}
         </div>
 
