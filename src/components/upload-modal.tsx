@@ -15,7 +15,11 @@ import { toast } from "sonner";
 import { uploadApiSpec } from "@/services/upload-spec";
 import { useAuth } from "@/hooks/use-auth";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft, Github, Archive, Send } from "lucide-react";
+import { SourceSelector } from "./source-selector";
+import { SourceType } from "@/types/source";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 interface UploadModalProps {
   open: boolean;
@@ -33,6 +37,7 @@ const ERROR_MESSAGES: Record<ValidationError, string> = {
 export function UploadModal({ open, onOpenChange }: UploadModalProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [selectedSource, setSelectedSource] = useState<SourceType | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [validatedData, setValidatedData] = useState<ValidatedSpec | null>(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -66,6 +71,14 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
     setError(null);
   };
 
+  const handleBack = () => {
+    if (validatedData || file) {
+      handleRemove();
+    } else {
+      setSelectedSource(null);
+    }
+  };
+
   const handleContinue = async () => {
     if (!file || !validatedData || !user) return;
 
@@ -87,6 +100,7 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
       // Small delay to allow animation to finish before resetting state
       setTimeout(() => {
         handleRemove();
+        setSelectedSource(null);
       }, 300);
     }
     onOpenChange(newOpen);
@@ -94,52 +108,181 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={resetAndClose}>
-      <DialogContent className="sm:max-w-[500px] overflow-hidden">
+      <DialogContent className={cn(
+        "overflow-hidden transition-all duration-300",
+        selectedSource ? "sm:max-w-[500px]" : "sm:max-w-[700px]"
+      )}>
         <DialogHeader>
-          <DialogTitle>Upload API Specification</DialogTitle>
+          <div className="flex items-center gap-2 mb-1">
+            {selectedSource && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground"
+                onClick={handleBack}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <DialogTitle>
+              {!selectedSource ? "Choose Documentation Source" : 
+               selectedSource === "openapi" ? "Upload OpenAPI Specification" :
+               selectedSource === "github" ? "Connect GitHub Repository" :
+               selectedSource === "zip" ? "Upload ZIP Project" :
+               "Import Postman Collection"}
+            </DialogTitle>
+          </div>
           <DialogDescription>
-            Import your OpenAPI or Swagger file to generate documentation.
+            {!selectedSource ? "Select how you want to import your API documentation." : 
+             selectedSource === "openapi" ? "Import your OpenAPI or Swagger file to generate documentation." :
+             selectedSource === "github" ? "Analyze your source code to automatically discover endpoints." :
+             selectedSource === "zip" ? "Upload your project archive for deep architectural analysis." :
+             "Transform your Postman collections into professional docs."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="py-4 min-h-[300px] flex flex-col justify-center">
-          {!validatedData ? (
-            <UploadDropzone 
-              onFileSelect={handleFileSelect} 
-              isValidating={isValidating}
-              error={error}
-            />
+          {!selectedSource ? (
+            <SourceSelector onSelect={setSelectedSource} />
+          ) : selectedSource === "openapi" ? (
+            !validatedData ? (
+              <UploadDropzone 
+                onFileSelect={handleFileSelect} 
+                isValidating={isValidating}
+                error={error}
+              />
+            ) : (
+              <FilePreview 
+                data={validatedData} 
+                onRemove={handleRemove}
+                onReplace={() => {
+                  handleRemove();
+                }}
+              />
+            )
           ) : (
-            <FilePreview 
-              data={validatedData} 
-              onRemove={handleRemove}
-              onReplace={() => {
-                handleRemove();
-              }}
-            />
+            <SourcePlaceholder type={selectedSource} />
           )}
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="ghost" onClick={() => resetAndClose(false)} disabled={isUploading}>
-            Cancel
-          </Button>
-          <Button 
-            className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow min-w-[100px]"
-            disabled={!validatedData || isUploading}
-            onClick={handleContinue}
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              "Continue"
+        {selectedSource && (
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => resetAndClose(false)} disabled={isUploading}>
+              Cancel
+            </Button>
+            {selectedSource === "openapi" && (
+              <Button 
+                className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow min-w-[100px]"
+                disabled={!validatedData || isUploading}
+                onClick={handleContinue}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  "Continue"
+                )}
+              </Button>
             )}
-          </Button>
-        </DialogFooter>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SourcePlaceholder({ type }: { type: SourceType }) {
+  const [repoUrl, setRepoUrl] = useState("");
+  const [isValidUrl, setIsValidUrl] = useState(false);
+
+  const validateUrl = (url: string) => {
+    setRepoUrl(url);
+    const githubUrlRegex = /^https:\/\/github\.com\/[\w-]+\/[\w.-]+$/;
+    setIsValidUrl(githubUrlRegex.test(url));
+  };
+
+  if (type === "github") {
+    return (
+      <div className="space-y-6 py-4 animate-in fade-in duration-500">
+        <div className="space-y-4">
+          <label className="text-sm font-semibold">GitHub Repository URL</label>
+          <div className="relative">
+            <Github className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input 
+              type="text"
+              placeholder="https://github.com/user/repository"
+              className="w-full pl-10 pr-4 py-2 bg-muted/40 border border-border/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              value={repoUrl}
+              onChange={(e) => validateUrl(e.target.value)}
+            />
+          </div>
+          {repoUrl && !isValidUrl && (
+            <p className="text-xs text-destructive">Please enter a valid GitHub repository URL.</p>
+          )}
+        </div>
+
+        {isValidUrl && (
+          <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <Github className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm truncate">{repoUrl.split('/').slice(-2).join('/')}</h4>
+                <p className="text-xs text-muted-foreground">GitHub Repository</p>
+              </div>
+            </div>
+            <div className="h-px bg-blue-500/10" />
+            <p className="text-xs text-blue-400 font-medium">
+              Repository Analysis will be available in Sprint 11B.
+            </p>
+          </div>
+        )}
+
+        <Button 
+          className="w-full bg-gradient-brand text-primary-foreground opacity-50 cursor-not-allowed"
+          disabled
+        >
+          Connect Repository
+        </Button>
+      </div>
+    );
+  }
+
+  if (type === "zip") {
+    return (
+      <div className="space-y-6 py-4 text-center animate-in fade-in duration-500">
+        <div className="border-2 border-dashed border-border/40 rounded-2xl p-10 bg-muted/20 hover:border-primary/30 transition-all cursor-pointer">
+          <div className="h-16 w-16 rounded-2xl bg-primary/5 text-primary flex items-center justify-center mx-auto mb-4">
+            <Archive className="h-8 w-8" />
+          </div>
+          <h4 className="font-bold mb-2">Upload Project Archive</h4>
+          <p className="text-sm text-muted-foreground mb-6">
+            Accepts .zip, .tar, or .tar.gz archives up to 50MB.
+          </p>
+          <Button variant="outline" className="border-border/40">Browse Files</Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Repository analysis coming soon.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 py-10 text-center animate-in fade-in duration-500">
+      <div className="h-20 w-20 rounded-3xl bg-primary/5 text-primary flex items-center justify-center mx-auto mb-6">
+        <Send className="h-10 w-10" />
+      </div>
+      <h3 className="text-xl font-bold">Postman Support</h3>
+      <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+        We are working hard to bring Postman Collection support to APIPilot. Stay tuned!
+      </p>
+      <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20">
+        Coming Soon
+      </Badge>
+    </div>
   );
 }

@@ -47,6 +47,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Github, Archive, Send } from "lucide-react";
+import { SourceType } from "@/types/source";
 import {
   Sheet,
   SheetContent,
@@ -110,6 +112,7 @@ type ApiSpec = {
   auth_type: string | null;
   created_at: string;
   updated_at: string;
+  source_type?: SourceType; // Optional for now as it's not in the DB yet
 };
 
 type SortOption = "newest" | "oldest" | "alphabetical";
@@ -428,6 +431,9 @@ const SpecCard = memo(function SpecCard({
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
+  // Derive source type - in a real app, this would come from the DB
+  const sourceType: SourceType = spec.source_type || (spec.openapi_version ? "openapi" : "openapi");
+
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
@@ -453,15 +459,28 @@ const SpecCard = memo(function SpecCard({
     failed: { label: "Failed", color: "bg-rose-500/10 text-rose-400 border-rose-500/20", icon: AlertTriangleIcon },
   };
 
+  const sourceConfig = {
+    openapi: { label: "OpenAPI", icon: FileJson, color: "bg-primary/5 text-primary" },
+    github: { label: "GitHub", icon: Github, color: "bg-blue-500/5 text-blue-500" },
+    zip: { label: "ZIP", icon: Archive, color: "bg-amber-500/5 text-amber-500" },
+    postman: { label: "Postman", icon: Send, color: "bg-orange-500/5 text-orange-500" },
+  };
+
   const config = statusConfig[spec.status];
+  const source = sourceConfig[sourceType];
 
   return (
     <>
       <Card className="group border-border/40 bg-card/40 backdrop-blur-sm hover:shadow-2xl hover:shadow-primary/5 hover:border-primary/30 transition-all duration-500 overflow-hidden flex flex-col relative rounded-2xl">
         <CardHeader className="pb-4">
           <div className="flex justify-between items-start gap-2">
+<<<<<<< HEAD
             <div className="p-2.5 rounded-xl bg-primary/5 text-primary border border-primary/10 group-hover:scale-110 group-hover:bg-primary/10 transition-all duration-500">
               <FileJson className="h-6 w-6" />
+=======
+            <div className={cn("p-2 rounded-lg border border-border/10 group-hover:scale-110 transition-transform duration-300", source.color)}>
+              <source.icon className="h-5 w-5" />
+>>>>>>> 8040178 (feat: implement repository intelligence foundation (Sprint 11A))
             </div>
             <div className="flex items-center gap-1.5">
               <Button
@@ -509,6 +528,9 @@ const SpecCard = memo(function SpecCard({
               >
                 {spec.status === "processing" && <config.icon className="h-2.5 w-2.5 animate-spin" />}
                 {config.label}
+              </Badge>
+              <Badge variant="outline" className="text-[9px] h-5 px-2 font-mono text-muted-foreground/50 border-border/20 rounded-full">
+                {source.label}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground/50 font-mono truncate">
