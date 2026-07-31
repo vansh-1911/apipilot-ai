@@ -15,7 +15,6 @@ import { toast } from "sonner";
 import { uploadApiSpec } from "@/services/upload-spec";
 import { useAuth } from "@/hooks/use-auth";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
 import { Loader2, ArrowLeft, Github, Archive, Send } from "lucide-react";
 import { SourceSelector } from "./source-selector";
 import { SourceType } from "@/types/source";
@@ -38,7 +37,6 @@ const ERROR_MESSAGES: Record<ValidationError, string> = {
 export function UploadModal({ open, onOpenChange }: UploadModalProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const [selectedSource, setSelectedSource] = useState<SourceType | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [validatedData, setValidatedData] = useState<ValidatedSpec | null>(null);
@@ -163,19 +161,7 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
               />
             )
           ) : (
-            <SourcePlaceholder
-              type={selectedSource}
-              onStart={(source, value) => {
-                resetAndClose(false);
-                navigate({
-                  to: "/repository/analyze",
-                  search:
-                    source === "github"
-                      ? { source, repo: value }
-                      : { source, file: value },
-                });
-              }}
-            />
+            <SourcePlaceholder type={selectedSource} />
           )}
         </div>
 
@@ -207,16 +193,9 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
   );
 }
 
-function SourcePlaceholder({
-  type,
-  onStart,
-}: {
-  type: SourceType;
-  onStart: (source: "github" | "zip", value: string) => void;
-}) {
+function SourcePlaceholder({ type }: { type: SourceType }) {
   const [repoUrl, setRepoUrl] = useState("");
   const [isValidUrl, setIsValidUrl] = useState(false);
-  const zipInputRef = React.useRef<HTMLInputElement>(null);
 
   const validateUrl = (url: string) => {
     setRepoUrl(url);
@@ -228,11 +207,10 @@ function SourcePlaceholder({
     return (
       <div className="space-y-6 py-4 animate-in fade-in duration-500">
         <div className="space-y-4">
-          <label className="text-sm font-semibold" htmlFor="repo-url">GitHub Repository URL</label>
+          <label className="text-sm font-semibold">GitHub Repository URL</label>
           <div className="relative">
             <Github className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input 
-              id="repo-url"
               type="text"
               placeholder="https://github.com/user/repository"
               className="w-full pl-10 pr-4 py-2 bg-muted/40 border border-border/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
@@ -258,15 +236,14 @@ function SourcePlaceholder({
             </div>
             <div className="h-px bg-blue-500/10" />
             <p className="text-xs text-blue-400 font-medium">
-              Repository Scanner will be connected in the next implementation.
+              Repository Analysis will be available in Sprint 11B.
             </p>
           </div>
         )}
 
         <Button 
-          className="w-full bg-gradient-brand text-primary-foreground shadow-glow hover:opacity-90 disabled:opacity-50"
-          disabled={!isValidUrl}
-          onClick={() => onStart("github", repoUrl)}
+          className="w-full bg-gradient-brand text-primary-foreground opacity-50 cursor-not-allowed"
+          disabled
         >
           Connect Repository
         </Button>
@@ -277,10 +254,7 @@ function SourcePlaceholder({
   if (type === "zip") {
     return (
       <div className="space-y-6 py-4 text-center animate-in fade-in duration-500">
-        <div
-          className="border-2 border-dashed border-border/40 rounded-2xl p-10 bg-muted/20 hover:border-primary/30 transition-all cursor-pointer"
-          onClick={() => zipInputRef.current?.click()}
-        >
+        <div className="border-2 border-dashed border-border/40 rounded-2xl p-10 bg-muted/20 hover:border-primary/30 transition-all cursor-pointer">
           <div className="h-16 w-16 rounded-2xl bg-primary/5 text-primary flex items-center justify-center mx-auto mb-4">
             <Archive className="h-8 w-8" />
           </div>
@@ -288,25 +262,14 @@ function SourcePlaceholder({
           <p className="text-sm text-muted-foreground mb-6">
             Accepts .zip, .tar, or .tar.gz archives up to 50MB.
           </p>
-          <input
-            ref={zipInputRef}
-            type="file"
-            accept=".zip,.tar,.gz"
-            className="sr-only"
-            onChange={(e) => {
-              const selected = e.target.files?.[0];
-              if (selected) onStart("zip", selected.name);
-            }}
-          />
           <Button variant="outline" className="border-border/40">Browse Files</Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Repository Scanner will be connected in the next implementation.
+          Repository analysis coming soon.
         </p>
       </div>
     );
   }
-
 
   return (
     <div className="space-y-6 py-10 text-center animate-in fade-in duration-500">
