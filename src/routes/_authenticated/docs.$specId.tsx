@@ -58,6 +58,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { HealthReport } from "@/components/health-report";
+import { ConfidenceBadge } from "@/components/confidence-badge";
 
 const ReactMarkdown = lazy(() => import("react-markdown"));
 const remarkGfm = import("remark-gfm").then(m => m.default);
@@ -88,6 +90,10 @@ export const Route = createFileRoute("/_authenticated/docs/$specId")({
   endpoint_count: number;
   servers: any;
   created_at: string;
+  language: string | null;
+  framework: string | null;
+  health_report: any | null;
+  repo_url: string | null;
 };
 
 type Doc = {
@@ -106,6 +112,7 @@ type Endpoint = {
   summary: string | null;
   tags: string[] | null;
   operation_id: string | null;
+  provenance: any | null;
 };
 
 function slugifyEndpoint(e: Endpoint) {
@@ -121,9 +128,9 @@ async function fetchAll(specId: string) {
   if (specRes.error) throw specRes.error;
   if (epRes.error) throw epRes.error;
   return {
-    spec: specRes.data as Spec,
-    doc: (docRes.data as Doc | null) ?? null,
-    endpoints: (epRes.data as Endpoint[]) ?? [],
+    spec: specRes.data as any,
+    doc: (docRes.data as any) ?? null,
+    endpoints: (epRes.data as any) ?? [],
   };
 }
 
@@ -175,6 +182,7 @@ function DocsPage() {
   const sections = useMemo(
     () => [
       { id: "overview", label: "Overview", content: data?.doc?.overview },
+      { id: "health-report", label: "Health Report", content: null },
       { id: "authentication", label: "Authentication", content: data?.doc?.auth_guide },
       { id: "quick-start", label: "Quick Start", content: data?.doc?.quick_start },
       { id: "best-practices", label: "Best Practices", content: data?.doc?.best_practices },
@@ -236,19 +244,19 @@ function DocsPage() {
     if (!searchQuery) return data.endpoints;
     const q = searchQuery.toLowerCase();
     return data.endpoints.filter(
-      (e) =>
+      (e: any) =>
         e.path.toLowerCase().includes(q) ||
         e.summary?.toLowerCase().includes(q) ||
         e.operation_id?.toLowerCase().includes(q) ||
-        e.tags?.some((t) => t.toLowerCase().includes(q))
+        e.tags?.some((t: any) => t.toLowerCase().includes(q))
     );
   }, [data?.endpoints, searchQuery]);
 
   const endpointsByTag = useMemo(() => {
     const groups: Record<string, Endpoint[]> = {};
-    filteredEndpoints.forEach((e) => {
+    filteredEndpoints.forEach((e: any) => {
       const tags = e.tags && e.tags.length > 0 ? e.tags : ["Untagged"];
-      tags.forEach((tag) => {
+      tags.forEach((tag: any) => {
         if (!groups[tag]) groups[tag] = [];
         groups[tag].push(e);
       });
@@ -584,7 +592,15 @@ function DocsPage() {
                   <h2 className="text-3xl font-bold tracking-tight text-foreground">{s.label}</h2>
                   <Separator className="w-12 border-2 border-primary/20" />
                 </div>
-                {s.content ? (
+                {s.id === "health-report" ? (
+                  spec.health_report ? (
+                    <HealthReport report={spec.health_report} />
+                  ) : (
+                    <p className="text-sm italic text-muted-foreground">
+                      Health report is being generated...
+                    </p>
+                  )
+                ) : s.content ? (
                   <Markdown content={s.content} />
                 ) : (
                   <p className="text-sm italic text-muted-foreground">
@@ -604,7 +620,7 @@ function DocsPage() {
                 <Separator className="w-12 border-2 border-primary/20" />
               </div>
               <div className="space-y-6">
-                {filteredEndpoints.map((e) => (
+                {filteredEndpoints.map((e: any) => (
                   <EndpointCard key={e.id} endpoint={e} id={slugifyEndpoint(e)} />
                 ))}
               </div>
@@ -764,6 +780,9 @@ function EndpointCard({ endpoint, id }: { endpoint: Endpoint; id: string }) {
         <div className="flex items-center gap-3">
           <MethodBadge method={endpoint.method} />
           <code className="text-sm font-semibold tracking-tight text-foreground">{endpoint.path}</code>
+          {endpoint.provenance?.confidence && (
+            <ConfidenceBadge level={endpoint.provenance.confidence} className="ml-2" />
+          )}
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyPath} title="Copy Path" aria-label="Copy endpoint path">

@@ -112,7 +112,10 @@ type ApiSpec = {
   auth_type: string | null;
   created_at: string;
   updated_at: string;
-  source_type?: SourceType; // Optional for now as it's not in the DB yet
+  source_type: SourceType;
+  language: string | null;
+  framework: string | null;
+  repo_url: string | null;
 };
 
 type SortOption = "newest" | "oldest" | "alphabetical";
@@ -155,10 +158,10 @@ function Dashboard() {
     queryFn: async (): Promise<ApiSpec[]> => {
       const { data, error } = await supabase
         .from("api_specs")
-        .select("id, name, description, file_name, file_path, status, endpoint_count, api_version, openapi_version, auth_type, created_at, updated_at")
+        .select("id, name, description, file_name, file_path, status, endpoint_count, api_version, openapi_version, auth_type, created_at, updated_at, source_type, language, framework, repo_url")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data as ApiSpec[]) ?? [];
+      return (data as any) ?? [];
     },
   });
 
@@ -554,9 +557,9 @@ const SpecCard = memo(function SpecCard({
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-muted-foreground/40">
-              <Zap className="h-3 w-3" /> Version
+              <Zap className="h-3 w-3" /> Framework
             </div>
-            <p className="text-sm font-bold">{spec.api_version || "N/A"}</p>
+            <p className="text-sm font-bold truncate">{spec.framework || spec.language || "N/A"}</p>
           </div>
           <div className="space-y-1 text-right">
             <div className="flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-widest font-bold text-muted-foreground/40">
