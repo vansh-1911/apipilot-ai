@@ -112,10 +112,10 @@ type ApiSpec = {
   auth_type: string | null;
   created_at: string;
   updated_at: string;
-  source_type: SourceType;
-  language: string | null;
-  framework: string | null;
-  repo_url: string | null;
+  source_type?: SourceType;
+  language?: string | null;
+  framework?: string | null;
+  repo_url?: string | null;
 };
 
 type SortOption = "newest" | "oldest" | "alphabetical";
