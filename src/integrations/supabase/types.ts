@@ -24,6 +24,7 @@ export type Database = {
           spec_id: string
           summary: string | null
           tags: string[] | null
+          provenance: Json | null
         }
         Insert: {
           created_at?: string
@@ -34,6 +35,7 @@ export type Database = {
           spec_id: string
           summary?: string | null
           tags?: string[] | null
+          provenance?: Json | null
         }
         Update: {
           created_at?: string
@@ -44,6 +46,7 @@ export type Database = {
           spec_id?: string
           summary?: string | null
           tags?: string[] | null
+          provenance?: Json | null
         }
         Relationships: [
           {
@@ -71,6 +74,15 @@ export type Database = {
           status: Database["public"]["Enums"]["spec_status"]
           updated_at: string
           user_id: string
+          source_type: string | null
+          language: string | null
+          framework: string | null
+          repo_url: string | null
+          last_commit: string | null
+          file_tree: Json | null
+          health_report: Json | null
+          env_vars: Json | null
+          readme_content: string | null
         }
         Insert: {
           api_version?: string | null
@@ -87,6 +99,15 @@ export type Database = {
           status?: Database["public"]["Enums"]["spec_status"]
           updated_at?: string
           user_id: string
+          source_type?: string | null
+          language?: string | null
+          framework?: string | null
+          repo_url?: string | null
+          last_commit?: string | null
+          file_tree?: Json | null
+          health_report?: Json | null
+          env_vars?: Json | null
+          readme_content?: string | null
         }
         Update: {
           api_version?: string | null
@@ -103,8 +124,52 @@ export type Database = {
           status?: Database["public"]["Enums"]["spec_status"]
           updated_at?: string
           user_id?: string
+          source_type?: string | null
+          language?: string | null
+          framework?: string | null
+          repo_url?: string | null
+          last_commit?: string | null
+          file_tree?: Json | null
+          health_report?: Json | null
+          env_vars?: Json | null
+          readme_content?: string | null
         }
         Relationships: []
+      }
+      api_models: {
+        Row: {
+          id: string
+          spec_id: string
+          name: string
+          fields: Json
+          provenance: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          spec_id: string
+          name: string
+          fields?: Json
+          provenance?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          spec_id?: string
+          name?: string
+          fields?: Json
+          provenance?: Json
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_models_spec_id_fkey"
+            columns: ["spec_id"]
+            isOneToOne: false
+            referencedRelation: "api_specs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       generated_docs: {
         Row: {
