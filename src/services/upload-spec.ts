@@ -48,6 +48,7 @@ export async function uploadApiSpec(
         file_path: storagePath,
         status: "uploaded",
         endpoint_count: 0,
+        source_type: "openapi",
       })
       .select("id")
       .single();
@@ -106,10 +107,14 @@ async function parseAndStoreMetadata(specId: string, file: File) {
         servers: metadata.servers,
         endpoint_count: metadata.endpointCount,
         status: "completed",
+        source_type: "openapi",
       })
       .eq("id", specId);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error("Error updating api_specs:", updateError);
+      throw updateError;
+    }
 
     // Insert endpoints
     if (metadata.endpoints.length > 0) {
