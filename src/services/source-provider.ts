@@ -31,7 +31,7 @@ export class GitHubSourceProvider extends BaseSourceProvider {
   type: SourceType = "github";
   
   async validate(url: string): Promise<{ isValid: boolean; error?: string }> {
-    const githubUrlRegex = /^https:\/\/github\.com\/[\w-]+\/[\w.-]+$/;
+    const githubUrlRegex = /^https:\/\/github\.com\/[\w-]+\/[\w.-]+(\/(tree|branch)\/[\w-]+)?$/;
     if (!githubUrlRegex.test(url)) {
       return { isValid: false, error: "Invalid GitHub repository URL" };
     }
@@ -39,8 +39,8 @@ export class GitHubSourceProvider extends BaseSourceProvider {
   }
 
   async upload(url: string, userId: string): Promise<{ success: boolean; specId?: string; error?: string }> {
-    // Placeholder for Sprint 11B
-    return { success: true, error: "Repository Analysis will be available in Sprint 11B." };
+    const { analyzeGitHubRepository } = await import("./repository-analysis");
+    return analyzeGitHubRepository(url, userId);
   }
 }
 
