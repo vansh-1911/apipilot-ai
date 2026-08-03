@@ -56,10 +56,11 @@ const SUGGESTED_QUESTIONS = [
 ];
 
 async function fetchSpecContext(specId: string) {
-  const [specRes, docRes, epRes] = await Promise.all([
+  const [specRes, docRes, epRes, modelsRes] = await Promise.all([
     supabase.from("api_specs").select("*").eq("id", specId).single(),
     supabase.from("generated_docs").select("*").eq("spec_id", specId).maybeSingle(),
     supabase.from("api_endpoints").select("*").eq("spec_id", specId),
+    supabase.from("api_models").select("*").eq("spec_id", specId),
   ]);
 
   if (specRes.error) throw specRes.error;
@@ -68,6 +69,7 @@ async function fetchSpecContext(specId: string) {
     spec: specRes.data,
     doc: docRes.data,
     endpoints: epRes.data || [],
+    models: modelsRes.data || [],
   };
 }
 
@@ -385,9 +387,13 @@ async function callChatAPI(userMessage: string, history: Message[], context: any
   const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
   const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-  const endpointList = context.endpoints
-    .map((e: any) => `- ${e.method} ${e.path}: ${e.summary || "No summary"}. Tags: ${e.tags?.join(", ") || "None"}.`)
-    .join("\n");
+  if (!context || !context.spec) {
+    throw new Error("API context not available. Please refresh the page.");
+  }
+
+  const endpointList = (context.endpoints || [])
+    .map((e: any) => `- ${e.method || "GET"} ${e.path}: ${e.summary || "No summary"}. Tags: ${e.tags?.join(", ") || "None"}.`)
+    .join("\n") || "No endpoints available.";
 
   const systemPrompt = `
 You are the API Intelligence Assistant for "${context.spec.name}".
@@ -398,13 +404,14 @@ API CONTEXT:
 - Language: ${context.spec.language || "Unknown"}
 - Framework: ${context.spec.framework || "Unknown"}
 - Auth Strategy: ${context.spec.auth_type || "None"}
-- Health Score: ${context.spec.health_report?.overallScore || "N/A"}
+- Source: ${context.spec.source_type || "openapi"}
+- Health Score: ${(context.spec.health_report as any)?.overallScore || "N/A"}
 
 ENDPOINTS AVAILABLE:
 ${endpointList}
 
 MODELS DETECTED:
-${(context.models || []).map((m: any) => `- ${m.name}: ${m.fields.map((f: any) => `${f.name} (${f.type})`).join(", ")}`).join("\n")}
+${(context.models || []).map((m: any) => `- ${m.name}: ${(m.fields || []).map((f: any) => `${f.name} (${f.type})`).join(", ")}`).join("\n") || "No models detected."}
 
 CORE INSTRUCTIONS:
 1. SOURCE OF TRUTH: Always prioritize verified data. Never invent endpoints, authentication methods, or request bodies.
