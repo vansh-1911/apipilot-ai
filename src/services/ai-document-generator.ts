@@ -132,13 +132,13 @@ function buildPrompt(spec: any, endpoints: any[]): string {
 
 function buildFallbackDocumentation(spec: any, endpoints: any[]) {
   const endpointList = endpoints.length
-    ? endpoints.map((endpoint: any) => `- **${endpoint.method} ${endpoint.path}** — ${endpoint.summary || "No summary available."}`).join("\\n")
+    ? endpoints.map((endpoint: any) => `- **${endpoint.method} ${endpoint.path}** — ${endpoint.summary || "No summary available."}`).join("\n")
     : "No endpoints were detected in the specification.";
   const overview = `${spec.name} exposes ${endpoints.length} documented endpoint${endpoints.length === 1 ? "" : "s"}. The specification is available in ${spec.openapi_version || "OpenAPI/Swagger"} format.`;
   const authGuide = `Authentication strategy detected from the specification: **${spec.auth_type || "None detected"}**. Confirm the required headers or credentials before making production requests.`;
-  const quickStart = `## Quick Start\\n\\nReview the available servers and send a request to one of the documented endpoints.\\n\\n### Endpoints\\n${endpointList}`;
+  const quickStart = `## Quick Start\n\nReview the available servers and send a request to one of the documented endpoints.\n\n### Endpoints\n${endpointList}`;
   const bestPractices = "Validate request data, handle errors consistently, use HTTPS, and keep credentials out of source control.";
-  const fullMarkdown = `# ${spec.name}\\n\\n${overview}\\n\\n## Authentication\\n\\n${authGuide}\\n\\n${quickStart}\\n\\n## Best Practices\\n\\n${bestPractices}`;
+  const fullMarkdown = `# ${spec.name}\n\n${overview}\n\n## Authentication\n\n${authGuide}\n\n${quickStart}\n\n## Best Practices\n\n${bestPractices}`;
   return { overview, auth_guide: authGuide, quick_start: quickStart, best_practices: bestPractices, full_markdown: fullMarkdown };
 }
 
