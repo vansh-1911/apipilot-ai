@@ -236,12 +236,15 @@ function parseGitHubUrl(repoUrl: string): { owner: string; repo: string; branch:
     if (url.protocol !== "https:" || url.hostname !== "github.com") return null;
 
     const parts = url.pathname.split("/").filter(Boolean);
-    if (parts.length < 2 || parts.length > 4) return null;
+    if (parts.length < 2) return null;
 
     const owner = parts[0];
     const repo = parts[1].replace(/\.git$/i, "");
     let branch = "main";
-    if (parts[2] === "tree" && parts[3]) branch = parts[3];
+    if (parts[2]) {
+      if (parts[2] !== "tree" || !parts[3]) return null;
+      branch = parts.slice(3).join("/");
+    }
     if (!/^[\w.-]+$/.test(owner) || !/^[\w.-]+$/.test(repo)) return null;
     if (!/^[\w./-]+$/.test(branch)) return null;
 
