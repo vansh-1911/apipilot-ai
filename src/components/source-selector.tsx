@@ -44,7 +44,7 @@ const SOURCES: SourceOption[] = [
     title: "ZIP Backend Project",
     description: "Upload your project source code as a ZIP archive for deep analysis.",
     icon: Archive,
-    status: "coming_soon",
+    status: "beta",
     buttonText: "Upload Archive",
   },
   {
