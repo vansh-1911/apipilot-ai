@@ -179,16 +179,23 @@ function DocsPage() {
     }
   };
 
-  const sections = useMemo(
-    () => [
-      { id: "overview", label: "Overview", content: data?.doc?.overview },
-      { id: "health-report", label: "Health Report", content: null },
+  const sections = useMemo(() => {
+    const list = [{ id: "overview", label: "Overview", content: data?.doc?.overview }];
+    if (
+      data?.spec?.source_type === "repository" ||
+      (data?.spec?.health_report &&
+        typeof data.spec.health_report === "object" &&
+        Array.isArray((data.spec.health_report as any).metrics))
+    ) {
+      list.push({ id: "health-report", label: "Health Report", content: null });
+    }
+    list.push(
       { id: "authentication", label: "Authentication", content: data?.doc?.auth_guide },
       { id: "quick-start", label: "Quick Start", content: data?.doc?.quick_start },
       { id: "best-practices", label: "Best Practices", content: data?.doc?.best_practices },
-    ],
-    [data],
-  );
+    );
+    return list;
+  }, [data]);
 
   useEffect(() => {
     if (!data?.spec) return;
