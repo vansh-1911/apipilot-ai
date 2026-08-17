@@ -391,6 +391,13 @@ async function callChatAPI(userMessage: string, history: Message[], context: any
     throw new Error("API context not available. Please refresh the page.");
   }
 
+  // OpenRouter is optional in local and preview environments. Keep Ask AI
+  // useful with verified context rather than sending an unauthenticated request
+  // that can remain pending and leave the conversation without an answer.
+  if (!OPENROUTER_API_KEY) {
+    return buildFallbackChatResponse(userMessage, context);
+  }
+
   const endpointList = (context.endpoints || [])
     .map((e: any) => `- ${e.method || "GET"} ${e.path}: ${e.summary || "No summary"}. Tags: ${e.tags?.join(", ") || "None"}.`)
     .join("\n") || "No endpoints available.";
@@ -452,4 +459,24 @@ The **POST /users** endpoint is verified from the source code.
   }
 
   return data.choices[0].message.content;
+}
+
+function buildFallbackChatResponse(userMessage: string, context: any): string {
+  const spec = context.spec;
+  const endpoints = Array.isArray(context.endpoints) ? context.endpoints : [];
+  const normalizedQuestion = userMessage.toLowerCase();
+  const auth = spec.auth_type || "None detected";
+  const endpointSummary = endpoints.length
+    ? endpoints.map((endpoint: any) => `- **${endpoint.method || "GET"} ${endpoint.path || "/"}** — ${endpoint.summary || "No verified summary available."}`).join("\n")
+    : "No verified endpoints were detected.";
+
+  if (normalizedQuestion.includes("auth")) {
+    return `The repository scan reports the authentication strategy as **${auth}**. No additional verified authentication requirement is present in the extracted API model. Review the source code before exposing the API publicly.`;
+  }
+
+  if (normalizedQuestion.includes("endpoint") || normalizedQuestion.includes("route") || normalizedQuestion.includes("upload")) {
+    return `The verified endpoints currently available in the API model are:\n\n${endpointSummary}`;
+  }
+
+  return `The verified API context contains **${endpoints.length} endpoint${endpoints.length === 1 ? "" : "s"}**, uses **${spec.language || "an unknown language"}** with **${spec.framework || "an unknown framework"}**, and reports authentication as **${auth}**. The optional AI provider is not configured in this environment, so this response is limited to persisted repository facts.`;
 }

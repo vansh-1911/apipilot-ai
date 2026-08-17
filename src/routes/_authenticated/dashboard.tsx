@@ -163,6 +163,15 @@ function Dashboard() {
       if (error) throw error;
       return (data as any) ?? [];
     },
+    // Repository and document generation run asynchronously in the browser.
+    // Keep the dashboard synchronized while any record is still processing,
+    // then stop polling once all records reach a terminal state.
+    refetchInterval: (query) => {
+      const currentSpecs = query.state.data as ApiSpec[] | undefined;
+      return currentSpecs?.some((spec) => spec.status === "processing") ? 2000 : false;
+    },
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
   });
 
   const stats = useMemo(() => {

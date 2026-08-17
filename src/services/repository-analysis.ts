@@ -226,8 +226,16 @@ async function analyzeRepositoryFilesAsync(specId: string, files: FileEntry[]): 
 
 async function markSpecFailed(specId: string, error: unknown): Promise<void> {
   const message = error instanceof Error ? error.message : String(error);
-  console.error(`Repository spec ${specId} failed: ${message}`);
-  await supabase.from("api_specs").update({ status: "failed" }).eq("id", specId);
+  console.error(`Repository spec ${specId} failed: ${message}`, error);
+
+  const { error: statusError } = await supabase
+    .from("api_specs")
+    .update({ status: "failed" })
+    .eq("id", specId);
+
+  if (statusError) {
+    console.error(`Unable to mark repository spec ${specId} as failed: ${statusError.message}`);
+  }
 }
 
 function parseGitHubUrl(repoUrl: string): { owner: string; repo: string; branch: string } | null {
