@@ -1,4 +1,3 @@
-import { supabase } from "@/integrations/supabase/client";
 import { unzipSync, strFromU8 } from "fflate";
 import { RepositoryScanner, FileEntry } from "./repository-scanner";
 
@@ -39,8 +38,10 @@ export async function analyzeGitHubRepository(
   repoUrl: string,
   userId: string,
 ): Promise<RepositoryAnalysisResult> {
+  console.log(`[GitHub] Starting analysis for repository URL: ${repoUrl}`);
   const parsed = parseGitHubUrl(repoUrl);
   if (!parsed) {
+    console.error(`[GitHub] Failed to parse GitHub repository URL: ${repoUrl}`);
     return { success: false, error: "Invalid GitHub repository URL." };
   }
 
@@ -53,14 +54,15 @@ export async function analyzeGitHubRepository(
       sourceType: "github",
       repoUrl,
     });
+    console.log(`[Persist] Created specification record with ID: ${specId}`);
 
     analyzeGitHubRepositoryAsync(specId, parsed).catch((error) => {
-      console.error("Async GitHub repository analysis failed:", error);
+      console.error("[GitHub] Async GitHub repository analysis failed with unhandled exception:", error);
     });
 
     return { success: true, specId };
   } catch (error) {
-    console.error("GitHub repository analysis error:", error);
+    console.error("[GitHub] GitHub repository analysis error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to create repository analysis.",
@@ -70,13 +72,12 @@ export async function analyzeGitHubRepository(
 
 /**
  * Creates a processing record and asynchronously analyzes a ZIP project archive.
- * TAR archives are intentionally rejected until a tar parser is added; ZIP is the
- * supported browser-safe archive format exposed by the upload flow.
  */
 export async function analyzeZipRepository(
   file: File,
   userId: string,
 ): Promise<RepositoryAnalysisResult> {
+  console.log(`[ZIP] Starting analysis for archive: ${file.name} (${file.size} bytes)`);
   if (!file.name.toLowerCase().endsWith(".zip")) {
     return { success: false, error: "Only ZIP project archives are supported currently." };
   }
@@ -93,22 +94,30 @@ export async function analyzeZipRepository(
       sourceType: "zip",
       repoUrl: null,
     });
+    console.log(`[Persist] Created ZIP specification record with ID: ${specId}`);
 
     readZipRepositoryFiles(file)
-      .then((files) => analyzeRepositoryFilesAsync(specId, files))
+      .then((files) => {
+        console.log(`[Extract] Extracted ${files.length} analyzable files from ZIP archive.`);
+        return analyzeRepositoryFilesAsync(specId, files);
+      })
       .catch(async (error) => {
-        console.error("Async ZIP repository analysis failed:", error);
+        console.error("[ZIP] Async ZIP repository analysis failed:", error);
         await markSpecFailed(specId, error);
       });
 
     return { success: true, specId };
   } catch (error) {
-    console.error("ZIP repository analysis error:", error);
+    console.error("[ZIP] ZIP repository analysis error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to create archive analysis.",
     };
   }
+}
+
+function sanitizeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9.-]/g, "_");
 }
 
 async function createRepositorySpec(
@@ -139,7 +148,7 @@ async function createRepositorySpec(
     .single();
 
   if (error || !data) {
-    throw new Error(`Failed to create repository record: ${error?.message || "unknown database error"}`);
+    throw new Error(`Failed to create repository record: ${error?.message || "unknown database error"} (code: ${error?.code || "N/A"})`);
   }
 
   return data.id;
@@ -150,16 +159,19 @@ async function analyzeGitHubRepositoryAsync(
   repository: { owner: string; repo: string; branch: string },
 ): Promise<void> {
   try {
+    console.log(`[Fetch] Fetching repository files for ${repository.owner}/${repository.repo} on branch ${repository.branch}...`);
     const files = await fetchRepositoryFiles(repository.owner, repository.repo, repository.branch);
+    console.log(`[Fetch] Successfully fetched ${files.length} analyzable files from GitHub.`);
     await analyzeRepositoryFilesAsync(specId, files);
   } catch (error) {
-    console.error("GitHub repository analysis failed:", error);
+    console.error("[GitHub] Async repository analysis failed:", error);
     await markSpecFailed(specId, error);
   }
 }
 
 async function analyzeRepositoryFilesAsync(specId: string, files: FileEntry[]): Promise<void> {
   try {
+    console.log(`[Scan] Initializing RepositoryScanner with ${files.length} files...`);
     if (files.length === 0) {
       throw new Error("No analyzable source files were found in the repository.");
     }
@@ -168,6 +180,8 @@ async function analyzeRepositoryFilesAsync(specId: string, files: FileEntry[]): 
     const scanResult = await scanner.scan(files);
     const framework = scanResult.metadata?.framework || "Unknown";
     const language = scanResult.metadata?.language || "Unknown";
+    console.log(`[Scan] Detected framework: ${framework}, language: ${language}, routes: ${scanResult.routes?.length || 0}`);
+
     const endpoints = (scanResult.routes || []).map((route: any) => ({
       method: route.method || "GET",
       path: route.path || "/",
@@ -179,6 +193,8 @@ async function analyzeRepositoryFilesAsync(specId: string, files: FileEntry[]): 
         confidence: "verified",
       },
     }));
+
+    console.log(`[Model] Created Unified API Model with ${endpoints.length} endpoints.`);
 
     const { error: updateError } = await supabase
       .from("api_specs")
@@ -194,9 +210,12 @@ async function analyzeRepositoryFilesAsync(specId: string, files: FileEntry[]): 
       })
       .eq("id", specId);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      throw new Error(`Failed to update spec metadata in database: ${updateError.message} (code: ${updateError.code})`);
+    }
 
     if (endpoints.length > 0) {
+      console.log(`[Persist] Inserting ${endpoints.length} endpoints into database...`);
       const { error: endpointsError } = await supabase.from("api_endpoints").insert(
         endpoints.map((endpoint: any) => ({
           spec_id: specId,
@@ -208,25 +227,34 @@ async function analyzeRepositoryFilesAsync(specId: string, files: FileEntry[]): 
           provenance: endpoint.provenance,
         })),
       );
-      if (endpointsError) throw endpointsError;
+      if (endpointsError) {
+        throw new Error(`Failed to insert endpoints: ${endpointsError.message} (code: ${endpointsError.code})`);
+      }
     }
 
+    console.log(`[Docs] Generating repository documentation for spec ${specId}...`);
     await generateRepositoryDocumentation(specId);
+    console.log(`[Docs] Documentation generated successfully.`);
 
+    console.log(`[Complete] Marking spec ${specId} as completed.`);
     const { error: completedError } = await supabase
       .from("api_specs")
       .update({ status: "completed" })
       .eq("id", specId);
-    if (completedError) throw completedError;
+    if (completedError) {
+      throw new Error(`Failed to mark spec as completed: ${completedError.message}`);
+    }
+    console.log(`[Complete] Spec ${specId} successfully completed and saved.`);
   } catch (error) {
-    console.error("Repository analysis failed:", error);
+    console.error("[Scan/Persist] Repository analysis workflow failed:", error);
     await markSpecFailed(specId, error);
   }
 }
 
 async function markSpecFailed(specId: string, error: unknown): Promise<void> {
   const message = error instanceof Error ? error.message : String(error);
-  console.error(`Repository spec ${specId} failed: ${message}`, error);
+  const details = error instanceof Error ? error.stack : undefined;
+  console.error(`[Error] Marking repository spec ${specId} as failed: ${message}`, details);
 
   const { error: statusError } = await supabase
     .from("api_specs")
@@ -234,7 +262,7 @@ async function markSpecFailed(specId: string, error: unknown): Promise<void> {
     .eq("id", specId);
 
   if (statusError) {
-    console.error(`Unable to mark repository spec ${specId} as failed: ${statusError.message}`);
+    console.error(`[Error] Unable to update spec status to failed in database: ${statusError.message}`);
   }
 }
 
@@ -274,9 +302,14 @@ async function fetchRepositoryFiles(
 
   for (const candidateBranch of branches) {
     try {
+      console.log(`[Fetch] Attempting to fetch branch '${candidateBranch}' for ${owner}/${repo}...`);
       await fetchDirectory("", candidateBranch);
-      if (files.length > 0) return files;
+      if (files.length > 0) {
+        console.log(`[Fetch] Successfully fetched ${files.length} files from branch '${candidateBranch}'.`);
+        return files;
+      }
     } catch (error) {
+      console.warn(`[Fetch] Branch '${candidateBranch}' fetch failed:`, error);
       branchError = error instanceof Error ? error : new Error(String(error));
     }
   }
@@ -289,13 +322,19 @@ async function fetchRepositoryFiles(
     visited.add(`${candidateBranch}:${path}`);
 
     const endpoint = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path}?ref=${encodeURIComponent(candidateBranch)}`;
-    const response = await fetch(endpoint, {
-      headers: { Accept: "application/vnd.github+json" },
-    });
+    const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
+    
+    // Support GitHub token from environment if available to prevent rate limits
+    const token = typeof process !== "undefined" && process.env?.GITHUB_TOKEN ? process.env.GITHUB_TOKEN : undefined;
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(endpoint, { headers });
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");
-      throw new Error(`GitHub API request failed (${response.status}): ${body || response.statusText}`);
+      throw new Error(`GitHub API request failed (${response.status} on ${path || "root"}): ${body || response.statusText}`);
     }
 
     const items: unknown = await response.json();
@@ -394,34 +433,40 @@ async function generateRepositoryDocumentation(specId: string): Promise<void> {
   };
 
   if (!apiKey) {
+    console.log("[Docs] No VITE_OPENROUTER_API_KEY found. Using deterministic fallback documentation generator.");
     documentation = buildFallbackRepositoryDocumentation(spec, endpoints || []);
   } else {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": "https://apipilot-ai.com",
-        "X-Title": "APIPilot AI",
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert technical writer specializing in API documentation. Generate comprehensive documentation for an API extracted from a repository. Respond ONLY with a JSON object containing overview, auth_guide, quick_start, best_practices, and full_markdown.",
-          },
-          { role: "user", content: prompt },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
+    try {
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+          "HTTP-Referer": "https://apipilot-ai.com",
+          "X-Title": "APIPilot AI",
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: "You are an expert technical writer specializing in API documentation. Generate comprehensive documentation for an API extracted from a repository. Respond ONLY with a JSON object containing overview, auth_guide, quick_start, best_practices, and full_markdown.",
+            },
+            { role: "user", content: prompt },
+          ],
+          response_format: { type: "json_object" },
+        }),
+      });
 
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error?.message || "OpenRouter API request failed");
-    const content = data.choices?.[0]?.message?.content;
-    if (typeof content !== "string") throw new Error("OpenRouter returned no documentation content");
-    documentation = JSON.parse(content);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error?.message || `OpenRouter API request failed (${response.status})`);
+      const content = data.choices?.[0]?.message?.content;
+      if (typeof content !== "string") throw new Error("OpenRouter returned no documentation content");
+      documentation = JSON.parse(content);
+    } catch (aiError) {
+      console.warn("[Docs] AI documentation generation failed, falling back to deterministic docs:", aiError);
+      documentation = buildFallbackRepositoryDocumentation(spec, endpoints || []);
+    }
   }
 
   const { error: insertError } = await supabase.from("generated_docs").insert({
@@ -432,61 +477,45 @@ async function generateRepositoryDocumentation(specId: string): Promise<void> {
     best_practices: documentation.best_practices,
     full_markdown: documentation.full_markdown,
   });
-  if (insertError) throw insertError;
+
+  if (insertError) {
+    throw new Error(`Failed to insert generated documentation: ${insertError.message} (code: ${insertError.code})`);
+  }
 }
 
 function buildRepositoryDocumentationPrompt(spec: any, endpoints: any[]): string {
-  const endpointList = endpoints
-    .map((endpoint: any) => `- ${endpoint.method} ${endpoint.path}: ${endpoint.summary || "No description"}`)
-    .join("\n");
-  const healthReport = spec.health_report || {};
-
-  return `
-Please generate API documentation for the following repository-extracted API:
-
-Repository: ${spec.repo_url || spec.name}
+  return `Generate comprehensive documentation for the following API specification and endpoints:
+Repository Name: ${spec.name}
+Description: ${spec.description}
 Framework: ${spec.framework || "Unknown"}
 Language: ${spec.language || "Unknown"}
-API Title: ${spec.name}
-Description: ${spec.description || "N/A"}
+Endpoints Count: ${endpoints.length}
 
-Health Report:
-- Overall Score: ${healthReport.overallScore || "N/A"}
-- Documentation Coverage: ${healthReport.documentationCoverage || "N/A"}
-- Best Practices Score: ${healthReport.bestPracticesScore || "N/A"}
+Endpoints:
+${endpoints.map(e => `- ${e.method} ${e.path}: ${e.summary || "No summary"}`).join("\n")}
 
-Endpoints (${endpoints.length} total):
-${endpointList || "No endpoints detected."}
-
-README Content:
-${spec.readme_content || "No README found"}
-
-Environment Variables:
-${spec.env_vars ? JSON.stringify(spec.env_vars, null, 2) : "None detected"}
-
-Return JSON with overview, auth_guide, quick_start, best_practices, and full_markdown.
-  `;
+Provide a JSON object with keys: overview, auth_guide, quick_start, best_practices, full_markdown.`;
 }
 
-function buildFallbackRepositoryDocumentation(spec: any, endpoints: any[]) {
-  const endpointList = endpoints.length
-    ? endpoints.map((endpoint: any) => `- **${endpoint.method} ${endpoint.path}** — ${endpoint.summary || "No summary available."}`).join("\n")
-    : "No API routes were detected from the repository source files.";
-  const overview = `${spec.name} is a ${spec.framework || "repository"}-based API analyzed by APIPilot AI. The scan detected ${endpoints.length} endpoint${endpoints.length === 1 ? "" : "s"} in ${spec.language || "the available source files"}.`;
-  const authGuide = `Authentication strategy detected by the repository scanner: **${spec.auth_type || "None detected"}**. Verify the implementation in the source code before exposing the API publicly.`;
-  const quickStart = `## Quick Start\n\nReview the repository README and configure the required environment variables before starting the service.\n\n### Detected endpoints\n${endpointList}`;
-  const bestPractices = "Use HTTPS, validate request input, apply authentication and rate limiting where appropriate, and keep secrets out of source control.";
-  const fullMarkdown = `# ${spec.name}\n\n${overview}\n\n## Authentication\n\n${authGuide}\n\n${quickStart}\n\n## Best Practices\n\n${bestPractices}`;
+function buildFallbackRepositoryDocumentation(spec: any, endpoints: any[]): {
+  overview: string;
+  auth_guide: string;
+  quick_start: string;
+  best_practices: string;
+  full_markdown: string;
+} {
+  const endpointList = endpoints.map(e => `### ${e.method} \`${e.path}\`\n${e.summary || "No summary provided."}`).join("\n\n");
+  const overview = `This documentation was automatically generated for **${spec.name}** (${spec.framework || "Generic"} / ${spec.language || "Codebase"}). It contains ${endpoints.length} discovered endpoints with verified provenance.`;
+  const auth_guide = `Authentication details depend on your application configuration. Consult the repository source files or README for specific security middleware or token validation schemes.`;
+  const quick_start = `To run this project locally, clone the repository and install dependencies according to your language/framework setup:\n\n\`\`\`bash\ngit clone ${spec.repo_url || "repository"}\n\`\`\``;
+  const best_practices = `1. Always validate incoming request payloads.\n2. Handle errors gracefully with standard HTTP status codes.\n3. Keep environment secrets out of source control.`;
+  const full_markdown = `# ${spec.name} Documentation\n\n${overview}\n\n## Authentication\n\n${auth_guide}\n\n## Endpoints\n\n${endpointList}\n\n## Quick Start\n\n${quick_start}\n\n## Best Practices\n\n${best_practices}`;
 
   return {
     overview,
-    auth_guide: authGuide,
-    quick_start: quickStart,
-    best_practices: bestPractices,
-    full_markdown: fullMarkdown,
+    auth_guide,
+    quick_start,
+    best_practices,
+    full_markdown,
   };
-}
-
-function sanitizeFileName(fileName: string): string {
-  return fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
 }
