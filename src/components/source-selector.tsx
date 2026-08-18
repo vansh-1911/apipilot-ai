@@ -6,7 +6,8 @@ import {
   Send, 
   ArrowRight,
   Sparkles,
-  Zap
+  Zap,
+  ChevronRight
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,35 +29,35 @@ const SOURCES: SourceOption[] = [
   {
     id: "github",
     title: "GitHub Repository",
-    description: "Connect any public or authorized repository for automatic API discovery, framework profiling, and documentation.",
+    description: "Connect public repositories for automatic framework profiling and route discovery.",
     icon: Github,
     status: "active",
-    buttonText: "Connect Repository",
+    buttonText: "Map Repository",
     highlight: true,
   },
   {
     id: "openapi",
     title: "OpenAPI / Swagger",
-    description: "Upload a JSON or YAML specification file to generate structured, interactive API documentation instantly.",
+    description: "Upload JSON/YAML specifications to generate interactive neural documentation.",
     icon: FileJson,
     status: "active",
-    buttonText: "Upload Specification",
+    buttonText: "Capture Spec",
   },
   {
     id: "zip",
     title: "ZIP Backend Project",
-    description: "Upload your project source code archive (Express, FastAPI, NestJS) for deep static analysis and route extraction.",
+    description: "Upload source archives for deep static analysis and route extraction.",
     icon: Archive,
     status: "active",
-    buttonText: "Upload Archive",
+    buttonText: "Analyze Archive",
   },
   {
     id: "postman",
     title: "Postman Collection",
-    description: "Import your Postman collections and test runs to transform them into professional developer documentation.",
+    description: "Transform Postman collections and test runs into professional intelligence.",
     icon: Send,
     status: "coming_soon",
-    buttonText: "Import Collection",
+    buttonText: "Import Signal",
   },
 ];
 
@@ -66,64 +67,59 @@ interface SourceSelectorProps {
 
 export function SourceSelector({ onSelect }: SourceSelectorProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-white/10 border border-white/10 font-mono">
       {SOURCES.map((source) => (
-        <Card 
+        <div 
           key={source.id}
           className={cn(
-            "group relative overflow-hidden border border-border/60 bg-card/60 backdrop-blur-2xl transition-all duration-500 rounded-2xl",
+            "group relative bg-black p-8 transition-all duration-500",
             source.status === "active" 
-              ? "hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 cursor-pointer hover:-translate-y-1" 
-              : "opacity-60 cursor-not-allowed",
-            source.highlight && "border-primary/40 bg-gradient-to-b from-primary/5 to-card/60"
+              ? "hover:bg-white/[0.02] cursor-pointer" 
+              : "opacity-40 cursor-not-allowed",
           )}
           onClick={() => source.status === "active" && onSelect(source.id)}
         >
           {source.highlight && (
-            <div className="absolute top-0 right-0 transform translate-x-2 -translate-y-2">
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-brand text-[10px] font-extrabold text-primary-foreground shadow-glow">
-                <Zap className="h-3 w-3" /> Recommended
+            <div className="absolute top-4 right-4">
+              <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-white/40 border border-white/10 px-2 py-0.5">
+                Recommended
               </span>
             </div>
           )}
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start mb-6">
-              <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 shadow-inner">
-                <source.icon className="h-6 w-6" />
+          
+          <div className="space-y-8">
+            <div className="flex justify-between items-start">
+              <div className="h-12 w-12 border border-white/20 grid place-items-center group-hover:border-white transition-colors duration-500">
+                <source.icon className="h-5 w-5 text-white/40 group-hover:text-white transition-colors" />
               </div>
-              <Badge 
-                variant="outline" 
-                className={cn(
-                  "text-[10px] font-mono uppercase tracking-wider py-0.5 px-2.5 rounded-full border",
-                  source.status === "active" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-muted text-muted-foreground border-border/40"
-                )}
-              >
-                {source.status === "active" ? "Active" : "Coming Soon"}
-              </Badge>
+              <span className={cn(
+                "text-[8px] font-bold uppercase tracking-[0.2em] px-2 py-0.5 border",
+                source.status === "active" ? "text-emerald-400 border-emerald-400/20 bg-emerald-400/5" : "text-white/20 border-white/10"
+              )}>
+                {source.status === "active" ? "Active" : "Locked"}
+              </span>
             </div>
             
-            <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors tracking-tight">
-              {source.title}
-            </h3>
-            <p className="text-sm text-muted-foreground leading-relaxed mb-6 min-h-[3.5rem]">
-              {source.description}
-            </p>
+            <div className="space-y-3">
+              <h3 className="text-lg font-light tracking-tight group-hover:text-white transition-colors">
+                {source.title}
+              </h3>
+              <p className="text-[11px] text-white/40 leading-relaxed min-h-[3rem] italic">
+                {source.description}
+              </p>
+            </div>
             
-            <Button 
-              variant="ghost" 
-              className={cn(
-                "w-full justify-between px-4 h-12 rounded-xl transition-all duration-300 font-bold",
-                source.status === "active" 
-                  ? "bg-muted/40 hover:bg-primary hover:text-primary-foreground border border-border/40 group-hover:border-primary" 
-                  : "bg-muted/20 text-muted-foreground cursor-not-allowed"
-              )}
-              disabled={source.status === "coming_soon"}
-            >
+            <div className={cn(
+              "flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.3em] transition-all",
+              source.status === "active" 
+                ? "text-white/40 group-hover:text-white" 
+                : "text-white/10"
+            )}>
               <span>{source.buttonText}</span>
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Button>
-          </CardContent>
-        </Card>
+              <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
+            </div>
+          </div>
+        </div>
       ))}
     </div>
   );
