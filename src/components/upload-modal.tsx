@@ -16,12 +16,11 @@ import { uploadApiSpec } from "@/services/upload-spec";
 import { GitHubSourceProvider, ZipSourceProvider } from "@/services/source-provider";
 import { useAuth } from "@/hooks/use-auth";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, ArrowLeft, Github, Archive, Send, X, ChevronRight } from "lucide-react";
+import { Loader2, ArrowLeft, Github, Archive, Send } from "lucide-react";
 import { SourceSelector } from "./source-selector";
 import { SourceType } from "@/types/source";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { motion, AnimatePresence } from "framer-motion";
 
 interface UploadModalProps {
   open: boolean;
@@ -29,11 +28,11 @@ interface UploadModalProps {
 }
 
 const ERROR_MESSAGES: Record<ValidationError, string> = {
-  unsupported_extension: "Invalid file extension.",
-  file_too_large: "Maximum size is 10 MB.",
-  invalid_format: "Invalid file format.",
-  invalid_openapi: "Invalid OpenAPI specification.",
-  read_failure: "Neural read failure.",
+  unsupported_extension: "Please upload a .json, .yaml, or .yml file.",
+  file_too_large: "File is too large. Maximum size is 10 MB.",
+  invalid_format: "Invalid JSON or YAML file.",
+  invalid_openapi: "This file is not a valid OpenAPI or Swagger specification.",
+  read_failure: "Failed to read the file. Please try again.",
 };
 
 export function UploadModal({ open, onOpenChange }: UploadModalProps) {
@@ -51,8 +50,12 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
   const handleFileSelect = async (selectedFile: File) => {
     setError(null);
     setIsValidating(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // Artificial delay to show loading state for small files
+    await new Promise(resolve => setTimeout(resolve, 600));
+
     const result = await validateApiSpec(selectedFile);
+    
     setIsValidating(false);
     
     if (result.error) {
@@ -61,7 +64,7 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
     } else if (result.data) {
       setFile(selectedFile);
       setValidatedData(result.data);
-      toast.success("Intelligence captured.");
+      toast.success("Specification validated successfully!");
     }
   };
 
@@ -86,7 +89,7 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
       queryClient.invalidateQueries({ queryKey: ["api_specs"] });
       resetAndClose(false);
     } else {
-      toast.error(result.error || "Neural link failure.");
+      toast.error(result.error || "Failed to start analysis.");
     }
   };
 
@@ -95,9 +98,10 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
     setIsUploading(true);
     try {
       const result = await uploadApiSpec(file, validatedData, user.id);
-      finishUpload(result, "Neural mapping initialized.");
+      finishUpload(result, "Specification uploaded successfully!");
     } catch (uploadError) {
-      finishUpload({ success: false, error: "Upload failure." }, "");
+      console.error("OpenAPI upload failed:", uploadError);
+      finishUpload({ success: false, error: "Failed to upload specification." }, "");
     }
   };
 
@@ -106,9 +110,10 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
     setIsUploading(true);
     try {
       const result = await new GitHubSourceProvider().upload(url, user.id);
-      finishUpload(result, "Repository mapping started.");
+      finishUpload(result, "Repository analysis started successfully!");
     } catch (uploadError) {
-      finishUpload({ success: false, error: "Connection failure." }, "");
+      console.error("GitHub repository upload failed:", uploadError);
+      finishUpload({ success: false, error: "Failed to start repository analysis." }, "");
     }
   };
 
@@ -117,14 +122,16 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
     setIsUploading(true);
     try {
       const result = await new ZipSourceProvider().upload(archive, user.id);
-      finishUpload(result, "Archive mapping started.");
+      finishUpload(result, "ZIP repository analysis started successfully!");
     } catch (uploadError) {
-      finishUpload({ success: false, error: "Neural read failure." }, "");
+      console.error("ZIP repository upload failed:", uploadError);
+      finishUpload({ success: false, error: "Failed to start ZIP analysis." }, "");
     }
   };
 
   const resetAndClose = (newOpen: boolean) => {
     if (!newOpen) {
+      // Small delay to allow animation to finish before resetting state
       setTimeout(() => {
         handleRemove();
         setSelectedSource(null);
@@ -136,90 +143,94 @@ export function UploadModal({ open, onOpenChange }: UploadModalProps) {
   return (
     <Dialog open={open} onOpenChange={resetAndClose}>
       <DialogContent className={cn(
-        "overflow-hidden transition-all duration-500 bg-black border-white/10 rounded-none p-0 font-mono",
-        selectedSource ? "sm:max-w-[500px]" : "sm:max-w-[800px]"
+        "overflow-hidden transition-all duration-300",
+        selectedSource ? "sm:max-w-[500px]" : "sm:max-w-[700px]"
       )}>
-        <div className="absolute inset-0 grid-bg opacity-5 pointer-events-none" />
-        
-        <div className="relative p-10 space-y-10">
-          <DialogHeader className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                {selectedSource && (
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-10 w-10 rounded-none border border-white/10 text-white/40 hover:text-white hover:bg-white/5"
-                    onClick={handleBack}
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                )}
-                <div className="space-y-1">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/20">Archive Interface</p>
-                  <DialogTitle className="text-2xl font-light tracking-tight text-white">
-                    {!selectedSource ? "Capture Intelligence" : 
-                     selectedSource === "openapi" ? "OpenAPI Upload" :
-                     selectedSource === "github" ? "GitHub Connect" :
-                     selectedSource === "zip" ? "Archive Upload" :
-                     "Postman Import"}
-                  </DialogTitle>
-                </div>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => resetAndClose(false)} className="h-10 w-10 rounded-none border border-white/10 text-white/40 hover:text-white hover:bg-white/5">
-                <X className="h-4 w-4" />
+        <DialogHeader>
+          <div className="flex items-center gap-2 mb-1">
+            {selectedSource && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground"
+                onClick={handleBack}
+              >
+                <ArrowLeft className="h-4 w-4" />
               </Button>
-            </div>
-            
-            <DialogDescription className="text-[11px] text-white/40 italic leading-relaxed">
-              {!selectedSource ? "Select the neural pathway to import your repository intelligence." : 
-               selectedSource === "openapi" ? "Import your OpenAPI or Swagger file for neural mapping." :
-               selectedSource === "github" ? "Analyze your source code to automatically discover intelligence." :
-               selectedSource === "zip" ? "Upload your project archive for deep architectural mapping." :
-               "Transform your Postman collections into intelligence units."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="min-h-[300px] flex flex-col justify-center">
-            {!selectedSource ? (
-              <SourceSelector onSelect={setSelectedSource} />
-            ) : selectedSource === "openapi" ? (
-              !validatedData ? (
-                <UploadDropzone onFileSelect={handleFileSelect} isValidating={isValidating} error={error} />
-              ) : (
-                <FilePreview data={validatedData} onRemove={handleRemove} onReplace={handleRemove} />
-              )
-            ) : (
-              <SourcePlaceholder
-                type={selectedSource}
-                repositoryUrl={repositoryUrl}
-                onRepositoryUrlChange={setRepositoryUrl}
-                onGitHubSubmit={handleRepositoryUpload}
-                onZipSubmit={handleZipUpload}
-                isUploading={isUploading}
-                selectedFile={repositoryFile}
-                onSelectedFileChange={setRepositoryFile}
-              />
             )}
+            <DialogTitle>
+              {!selectedSource ? "Choose Documentation Source" : 
+               selectedSource === "openapi" ? "Upload OpenAPI Specification" :
+               selectedSource === "github" ? "Connect GitHub Repository" :
+               selectedSource === "zip" ? "Upload ZIP Project" :
+               "Import Postman Collection"}
+            </DialogTitle>
           </div>
+          <DialogDescription>
+            {!selectedSource ? "Select how you want to import your API documentation." : 
+             selectedSource === "openapi" ? "Import your OpenAPI or Swagger file to generate documentation." :
+             selectedSource === "github" ? "Analyze your source code to automatically discover endpoints." :
+             selectedSource === "zip" ? "Upload your project archive for deep architectural analysis." :
+             "Transform your Postman collections into professional docs."}
+          </DialogDescription>
+        </DialogHeader>
 
-          {selectedSource && (
-            <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-white/10">
-              <Button variant="outline" className="flex-1 rounded-none border-white/10 h-14 text-[10px] font-bold uppercase tracking-widest hover:bg-white/5" onClick={() => resetAndClose(false)} disabled={isUploading}>
-                Disconnect
-              </Button>
-              {selectedSource === "openapi" && (
-                <Button 
-                  className="flex-1 bg-white text-black hover:bg-white/90 rounded-none h-14 text-[10px] font-bold uppercase tracking-widest shadow-glow"
-                  disabled={!validatedData || isUploading}
-                  onClick={handleContinue}
-                >
-                  {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Initialize Mapping"}
-                </Button>
-              )}
-            </div>
+        <div className="py-4 min-h-[300px] flex flex-col justify-center">
+          {!selectedSource ? (
+            <SourceSelector onSelect={setSelectedSource} />
+          ) : selectedSource === "openapi" ? (
+            !validatedData ? (
+              <UploadDropzone 
+                onFileSelect={handleFileSelect} 
+                isValidating={isValidating}
+                error={error}
+              />
+            ) : (
+              <FilePreview 
+                data={validatedData} 
+                onRemove={handleRemove}
+                onReplace={() => {
+                  handleRemove();
+                }}
+              />
+            )
+          ) : (
+            <SourcePlaceholder
+              type={selectedSource}
+              repositoryUrl={repositoryUrl}
+              onRepositoryUrlChange={setRepositoryUrl}
+              onGitHubSubmit={handleRepositoryUpload}
+              onZipSubmit={handleZipUpload}
+              isUploading={isUploading}
+              selectedFile={repositoryFile}
+              onSelectedFileChange={setRepositoryFile}
+            />
           )}
         </div>
+
+        {selectedSource && (
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => resetAndClose(false)} disabled={isUploading}>
+              Cancel
+            </Button>
+            {selectedSource === "openapi" && (
+              <Button 
+                className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow min-w-[100px]"
+                disabled={!validatedData || isUploading}
+                onClick={handleContinue}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  "Continue"
+                )}
+              </Button>
+            )}
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -250,46 +261,49 @@ function SourcePlaceholder({
 
   if (type === "github") {
     return (
-      <div className="space-y-8 py-4 animate-in fade-in duration-700">
+      <div className="space-y-6 py-4 animate-in fade-in duration-500">
         <div className="space-y-4">
-          <label htmlFor="github-url" className="text-[10px] font-bold uppercase tracking-widest text-white/40 px-1">Neural Path (URL)</label>
+          <label htmlFor="github-repository-url" className="text-sm font-semibold">GitHub Repository URL</label>
           <div className="relative">
-            <Github className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20" />
+            <Github className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
-              id="github-url"
+              id="github-repository-url"
               type="url"
               placeholder="https://github.com/user/repository"
-              className="w-full h-14 bg-white/5 border border-white/10 rounded-none pl-12 pr-6 text-sm focus:border-white/30 transition-all placeholder:text-white/10"
+              className="w-full rounded-lg border border-border/40 bg-muted/40 py-2 pl-10 pr-4 transition-all focus:outline-none focus:ring-2 focus:ring-primary/20"
               value={repositoryUrl}
-              onChange={(e) => onRepositoryUrlChange(e.target.value)}
+              onChange={(event) => onRepositoryUrlChange(event.target.value)}
               disabled={isUploading}
             />
           </div>
-          {repositoryUrl && !isValidUrl && <p className="text-[10px] text-red-500 italic px-1">Invalid repository pathway detected.</p>}
+          {repositoryUrl && !isValidUrl && (
+            <p className="text-xs text-destructive">Please enter a valid public GitHub repository URL.</p>
+          )}
         </div>
 
         {isValidUrl && (
-          <div className="p-6 border border-white/10 bg-white/[0.02] space-y-4">
-            <div className="flex items-center gap-4">
-              <div className="h-10 w-10 border border-white/20 grid place-items-center">
-                <Github className="h-5 w-5 text-white" />
+          <div className="space-y-3 rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
+                <Github className="h-5 w-5 text-blue-500" />
               </div>
               <div className="min-w-0">
-                <h4 className="truncate text-sm font-light tracking-tight">{repositoryUrl.replace(/^https:\/\/github\.com\//, "")}</h4>
-                <p className="text-[9px] font-bold uppercase tracking-widest text-white/20">Public Neural Map</p>
+                <h4 className="truncate text-sm font-bold">{repositoryUrl.replace(/^https:\/\/github\.com\//, "")}</h4>
+                <p className="text-xs text-muted-foreground">Public GitHub repository analysis</p>
               </div>
             </div>
-            <div className="h-px bg-white/5" />
-            <p className="text-[10px] italic text-white/40 leading-relaxed">Neural analysis will extract routes, architectural patterns, and data models from this repository.</p>
+            <div className="h-px bg-blue-500/10" />
+            <p className="text-xs font-medium text-blue-400">The repository will be scanned for routes, frameworks, models, environment variables, and documentation health.</p>
           </div>
         )}
 
         <Button
-          className="w-full bg-white text-black hover:bg-white/90 rounded-none h-14 text-[10px] font-bold uppercase tracking-widest shadow-glow"
+          className="w-full bg-gradient-brand text-primary-foreground shadow-glow hover:opacity-90"
           disabled={!isValidUrl || isUploading}
           onClick={() => onGitHubSubmit(repositoryUrl.trim())}
         >
-          {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Map Repository"}
+          {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Github className="mr-2 h-4 w-4" />}
+          {isUploading ? "Starting analysis..." : "Connect Repository"}
         </Button>
       </div>
     );
@@ -297,47 +311,44 @@ function SourcePlaceholder({
 
   if (type === "zip") {
     return (
-      <div className="space-y-8 py-4 text-center animate-in fade-in duration-700">
+      <div className="space-y-6 py-4 text-center animate-in fade-in duration-500">
         <input
-          id="zip-archive"
+          id="repository-archive"
           type="file"
           accept=".zip,application/zip"
           className="sr-only"
-          onChange={(e) => onSelectedFileChange(e.target.files?.[0] || null)}
+          onChange={(event) => onSelectedFileChange(event.target.files?.[0] || null)}
           disabled={isUploading}
         />
-        <label htmlFor="zip-archive" className="block cursor-pointer border border-dashed border-white/10 bg-white/[0.02] p-12 transition-all hover:bg-white/5 group">
-          <div className="mx-auto mb-6 h-16 w-16 border border-white/20 grid place-items-center text-white/40 group-hover:text-white group-hover:border-white transition-all">
+        <label htmlFor="repository-archive" className="block cursor-pointer rounded-2xl border-2 border-dashed border-border/40 bg-muted/20 p-10 transition-all hover:border-primary/30">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/5 text-primary">
             <Archive className="h-8 w-8" />
           </div>
-          <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] mb-2">Neural Archive Capture</h4>
-          <p className="text-[10px] text-white/20 uppercase tracking-widest mb-8">Maximum capacity: 50 MB</p>
-          <span className="inline-flex border border-white/20 px-6 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all">Select Archive</span>
+          <h4 className="mb-2 font-bold">Upload ZIP Project Archive</h4>
+          <p className="mb-4 text-sm text-muted-foreground">ZIP archives up to 50 MB are supported.</p>
+          <span className="inline-flex rounded-md border border-border/40 px-4 py-2 text-sm font-medium">Browse Files</span>
         </label>
-        
-        {selectedFile && <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 truncate">Selected: {selectedFile.name}</p>}
-        
+        {selectedFile && <p className="truncate text-sm font-medium text-primary">Selected: {selectedFile.name}</p>}
         <Button
-          className="w-full bg-white text-black hover:bg-white/90 rounded-none h-14 text-[10px] font-bold uppercase tracking-widest shadow-glow"
+          className="w-full bg-gradient-brand text-primary-foreground shadow-glow hover:opacity-90"
           disabled={!selectedFile || isUploading}
           onClick={() => selectedFile && onZipSubmit(selectedFile)}
         >
-          {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Analyze Archive"}
+          {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Archive className="mr-2 h-4 w-4" />}
+          {isUploading ? "Starting analysis..." : "Analyze ZIP Project"}
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 py-12 text-center animate-in fade-in duration-700">
-      <div className="mx-auto h-20 w-20 border border-white/10 grid place-items-center text-white/20">
+    <div className="space-y-6 py-10 text-center animate-in fade-in duration-500">
+      <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-primary/5 text-primary">
         <Send className="h-10 w-10" />
       </div>
-      <div className="space-y-2">
-        <h3 className="text-lg font-light tracking-tight">Postman Integration</h3>
-        <p className="text-[10px] text-white/20 uppercase tracking-widest italic">Signal not yet synchronized.</p>
-      </div>
-      <Badge className="rounded-none bg-white/5 text-white/40 border-white/10 text-[9px] uppercase tracking-widest font-bold">Coming Soon</Badge>
+      <h3 className="text-xl font-bold">Postman Support</h3>
+      <p className="mx-auto max-w-xs text-sm text-muted-foreground">We are working hard to bring Postman Collection support to APIPilot. Stay tuned!</p>
+      <Badge variant="outline" className="border-blue-500/20 bg-blue-500/10 text-blue-500">Coming Soon</Badge>
     </div>
   );
 }

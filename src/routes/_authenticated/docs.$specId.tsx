@@ -25,8 +25,6 @@ import {
   Printer,
   MoreHorizontal,
   Sparkles,
-  ExternalLink,
-  Bot
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +60,6 @@ import {
 } from "@/components/ui/collapsible";
 import { HealthReport } from "@/components/health-report";
 import { ConfidenceBadge } from "@/components/confidence-badge";
-import { motion, AnimatePresence } from "framer-motion";
 
 const ReactMarkdown = lazy(() => import("react-markdown"));
 const remarkGfm = import("remark-gfm").then(m => m.default);
@@ -81,7 +78,7 @@ export const Route = createFileRoute("/_authenticated/docs/$specId")({
   component: DocsPage,
 });
 
-type Spec = {
+  type Spec = {
   id: string;
   name: string;
   description: string | null;
@@ -97,7 +94,6 @@ type Spec = {
   framework: string | null;
   health_report: any | null;
   repo_url: string | null;
-  source_type?: string;
 };
 
 type Doc = {
@@ -142,7 +138,7 @@ function DocsPage() {
   const { specId } = Route.useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["docs", specId],
     queryFn: () => fetchAll(specId),
     refetchInterval: (q) => {
@@ -169,10 +165,14 @@ function DocsPage() {
     try {
       const result = await deleteApiSpec(data.spec.id, data.spec.file_path);
       if (result.success) {
-        toast.success("Intelligence unit decommissioned.");
+        toast.success("Specification deleted successfully.");
         queryClient.invalidateQueries({ queryKey: ["api_specs"] });
         navigate({ to: "/dashboard" });
+      } else {
+        toast.error(result.error || "Failed to delete specification.");
       }
+    } catch (error) {
+      toast.error("An unexpected error occurred.");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -199,11 +199,18 @@ function DocsPage() {
 
   useEffect(() => {
     if (!data?.spec) return;
+    
+    // Add to recent APIs
     const savedRecent = localStorage.getItem("apipilot_recent");
     let recent: string[] = savedRecent ? JSON.parse(savedRecent) : [];
+    
+    // Remove if already exists to move to top
     recent = recent.filter(id => id !== data.spec.id);
+    // Add to top
     recent.unshift(data.spec.id);
+    // Limit to 5
     recent = recent.slice(0, 5);
+    
     localStorage.setItem("apipilot_recent", JSON.stringify(recent));
   }, [data?.spec]);
 
@@ -261,14 +268,14 @@ function DocsPage() {
         groups[tag].push(e);
       });
     });
-    return { groups, groupNames: Object.keys(groups).sort() };
+    return groups;
   }, [filteredEndpoints]);
 
   const copyMarkdown = async () => {
     if (!fullMarkdown) return;
     await navigator.clipboard.writeText(fullMarkdown);
     setCopied(true);
-    toast.success("Intelligence data copied");
+    toast.success("Markdown copied to clipboard");
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -283,6 +290,26 @@ function DocsPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    toast.success("Markdown exported");
+  };
+
+  const downloadPlainText = () => {
+    if (!fullMarkdown || !data?.spec) return;
+    // Simple regex to strip some markdown syntax for plain text
+    const plainText = fullMarkdown
+      .replace(/#+\s/g, "")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/`{1,3}/g, "");
+    const blob = new Blob([plainText], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${data.spec.name.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Plain text exported");
   };
 
   if (isLoading) return <LoadingState />;
@@ -291,82 +318,108 @@ function DocsPage() {
   const { spec, doc, endpoints } = data;
 
   return (
-    <div className="min-h-screen bg-black text-white font-mono selection:bg-white/20">
-      <div className="sticky top-0 z-40 border-b border-white/10 bg-black/80 backdrop-blur-xl h-20 flex items-center px-4 sm:px-8">
-        <div className="mx-auto flex w-full max-w-[1400px] items-center justify-between gap-4">
+    <div className="min-h-screen bg-background selection:bg-primary/10 selection:text-primary">
+      {/* Toolbar */}
+      <div className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate({ to: "/dashboard" })}
-            className="gap-3 rounded-none border border-white/10 text-[10px] font-bold uppercase tracking-widest hover:bg-white/5 h-11 px-6"
+            className="gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Workspace</span>
+            <span className="hidden sm:inline">Back to Dashboard</span>
           </Button>
-          
-          <div className="flex items-center gap-4">
-            <div className="hidden items-center gap-4 md:flex">
+          <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 md:flex">
               <Button
-                className="bg-white text-black hover:bg-white/90 rounded-none h-11 px-6 text-[10px] font-bold uppercase tracking-widest gap-2"
+                className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow-sm border-none gap-2"
+                size="sm"
                 onClick={() => navigate({ to: `/chat/${specId}` })}
               >
-                <Bot className="h-4 w-4" />
-                Ask Assistant
+                <Sparkles className="h-4 w-4" />
+                <span>Ask AI</span>
               </Button>
-              <Separator orientation="vertical" className="h-6 bg-white/10" />
-              <Button variant="outline" size="sm" onClick={copyMarkdown} disabled={!fullMarkdown} className="gap-2 rounded-none border-white/10 h-11 text-[10px] font-bold uppercase tracking-widest bg-transparent hover:bg-white/5">
+              <Separator orientation="vertical" className="h-6 mx-1" />
+              <Button variant="outline" size="sm" onClick={copyMarkdown} disabled={!fullMarkdown} className="gap-2">
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                Copy
+                <span>Copy Markdown</span>
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={!fullMarkdown} className="gap-2 rounded-none border-white/10 h-11 text-[10px] font-bold uppercase tracking-widest bg-transparent hover:bg-white/5">
+                  <Button variant="outline" size="sm" disabled={!fullMarkdown} className="gap-2">
                     <Download className="h-4 w-4" />
-                    Export
+                    <span>Export</span>
                     <ChevronDown className="h-3 w-3 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-black border-white/10 rounded-none p-1">
-                  <DropdownMenuItem onClick={downloadMarkdown} className="gap-2 text-[10px] font-bold uppercase tracking-widest focus:bg-white/10">
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={downloadMarkdown} className="gap-2">
                     <FileText className="h-4 w-4" />
-                    Markdown (.md)
+                    <span>Markdown (.md)</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => window.print()} className="gap-2 text-[10px] font-bold uppercase tracking-widest focus:bg-white/10">
+                  <DropdownMenuItem onClick={downloadPlainText} className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    <span>Plain Text (.txt)</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => window.print()} className="gap-2">
                     <Printer className="h-4 w-4" />
-                    PDF (Print)
+                    <span>PDF (Print)</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <Separator orientation="vertical" className="h-6" />
               <Button
                 variant="ghost"
                 size="sm"
-                className="gap-2 text-red-500 hover:bg-red-500/10 rounded-none h-11 text-[10px] font-bold uppercase tracking-widest"
+                className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 onClick={() => setDeleteDialogOpen(true)}
+                disabled={isDeleting}
               >
-                <Trash2 className="h-4 w-4" />
-                Delete
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                <span>Delete</span>
               </Button>
             </div>
 
+            {/* Mobile Actions */}
             <div className="md:hidden">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="rounded-none border-white/10 h-11 w-11 bg-transparent">
+                  <Button variant="outline" size="icon" aria-label="More actions">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-black border-white/10 rounded-none w-48 p-1">
-                  <DropdownMenuItem onClick={() => navigate({ to: `/chat/${specId}` })} className="gap-2 text-white text-[10px] font-bold uppercase tracking-widest focus:bg-white/10">
-                    <Bot className="h-4 w-4" />
-                    Ask Assistant
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => navigate({ to: `/chat/${specId}` })} className="gap-2 text-primary focus:text-primary">
+                    <Sparkles className="h-4 w-4" />
+                    <span>Ask AI Assistant</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={copyMarkdown} className="gap-2 text-[10px] font-bold uppercase tracking-widest focus:bg-white/10">
+                  <Separator className="my-1" />
+                  <DropdownMenuItem onClick={copyMarkdown} disabled={!fullMarkdown} className="gap-2">
                     <Copy className="h-4 w-4" />
-                    Copy Data
+                    <span>Copy Markdown</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setDeleteDialogOpen(true)} className="gap-2 text-red-500 text-[10px] font-bold uppercase tracking-widest focus:bg-red-500/10">
+                  <DropdownMenuItem onClick={downloadMarkdown} disabled={!fullMarkdown} className="gap-2">
+                    <Download className="h-4 w-4" />
+                    <span>Download .md</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={downloadPlainText} disabled={!fullMarkdown} className="gap-2">
+                    <Download className="h-4 w-4" />
+                    <span>Download .txt</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => window.print()} disabled={!fullMarkdown} className="gap-2">
+                    <Printer className="h-4 w-4" />
+                    <span>Print to PDF</span>
+                  </DropdownMenuItem>
+                  <Separator className="my-1" />
+                  <DropdownMenuItem
+                    onClick={() => setDeleteDialogOpen(true)}
+                    disabled={isDeleting}
+                    className="gap-2 text-destructive focus:text-destructive"
+                  >
                     <Trash2 className="h-4 w-4" />
-                    Delete
+                    <span>Delete API</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -375,182 +428,256 @@ function DocsPage() {
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-12 px-8 py-16 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="lg:sticky lg:top-36 lg:h-[calc(100vh-10rem)] lg:overflow-y-auto pr-4 scrollbar-hide">
-          <div className="mb-12 space-y-8">
-            <div className="space-y-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/20">Archive</p>
-              <h1 className="text-3xl font-light tracking-tighter leading-none">{spec.name}</h1>
-              <div className="flex flex-wrap gap-2 pt-2">
-                <Badge className="rounded-none bg-white/5 text-white/40 border-white/10 text-[9px] uppercase tracking-widest font-bold">v{spec.api_version || "1.0"}</Badge>
-                {spec.framework && <Badge className="rounded-none bg-white/5 text-white/40 border-white/10 text-[9px] uppercase tracking-widest font-bold">{spec.framework}</Badge>}
-              </div>
-            </div>
-
+      <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        {/* Sidebar */}
+        <aside className="lg:sticky lg:top-20 lg:h-[calc(100vh-6rem)] lg:overflow-y-auto">
+          <div className="mb-4 px-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/20" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Filter routes..."
-                className="h-11 pl-10 text-[11px] bg-white/5 border-white/10 rounded-none focus:border-white/30 placeholder:text-white/20"
+                placeholder="Search endpoints..."
+                className="h-9 pl-9 text-xs"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search endpoints"
               />
             </div>
           </div>
+          <nav className="space-y-1">
+            {sections.map((s) => (
+              <SidebarLink
+                key={s.id}
+                label={s.label}
+                active={activeId === s.id}
+                onClick={() => scrollTo(s.id)}
+              />
+            ))}
 
-          <nav className="space-y-10">
-            <div className="space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/20 mb-4 px-2">Navigation</p>
-              {sections.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => scrollTo(s.id)}
-                  className={cn(
-                    "w-full text-left px-3 py-3 text-[11px] font-bold uppercase tracking-widest transition-all border-l-2",
-                    activeId === s.id ? "border-white text-white bg-white/5" : "border-transparent text-white/40 hover:text-white/60 hover:bg-white/[0.02]"
-                  )}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="space-y-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/20 mb-4 px-2">Routes</p>
-              {endpointsByTag.groupNames.map((tag) => (
-                <Collapsible key={tag} open={expandedTags[tag] !== false} onOpenChange={() => toggleTag(tag)} className="space-y-1">
-                  <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:text-white group">
-                    <span className="truncate">{tag}</span>
-                    <ChevronDown className={cn("h-3 w-3 transition-transform duration-300", !expandedTags[tag] && expandedTags[tag] !== undefined && "-rotate-90")} />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-1 pl-2">
-                    {endpointsByTag.groups[tag].map((e) => (
-                      <button
-                        key={e.id}
-                        onClick={() => scrollTo(slugifyEndpoint(e))}
-                        className={cn(
-                          "w-full text-left px-3 py-2 text-[10px] font-mono transition-all flex items-center gap-2",
-                          activeId === slugifyEndpoint(e) ? "text-white bg-white/5" : "text-white/30 hover:text-white/50"
+            {Object.keys(endpointsByTag).length > 0 && (
+              <>
+                <div className="my-4 flex items-center gap-2 px-3">
+                  <Separator className="flex-1" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Endpoints
+                  </span>
+                  <Separator className="flex-1" />
+                </div>
+                <div className="space-y-1">
+                  {Object.entries(endpointsByTag).sort().map(([tag, eps]) => (
+                    <Collapsible
+                      key={tag}
+                      open={expandedTags[tag] !== false}
+                      onOpenChange={() => toggleTag(tag)}
+                    >
+                      <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground">
+                        {expandedTags[tag] !== false ? (
+                          <ChevronDown className="h-3 w-3" />
+                        ) : (
+                          <ChevronRight className="h-3 w-3" />
                         )}
-                      >
-                        <span className={cn(
-                          "text-[8px] font-bold px-1.5 py-0.5 min-w-[32px] text-center",
-                          e.method === "GET" ? "text-blue-400 bg-blue-400/10" :
-                          e.method === "POST" ? "text-emerald-400 bg-emerald-400/10" :
-                          e.method === "PUT" ? "text-amber-400 bg-amber-400/10" :
-                          "text-red-400 bg-red-400/10"
-                        )}>
-                          {e.method}
+                        <span className="truncate">{tag}</span>
+                        <span className="ml-auto text-[10px] font-normal text-muted-foreground/60">
+                          {eps.length}
                         </span>
-                        <span className="truncate">{e.path}</span>
-                      </button>
-                    ))}
-                  </CollapsibleContent>
-                </Collapsible>
-              ))}
-            </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-0.5 pt-0.5">
+                        {eps.map((e) => {
+                          const id = slugifyEndpoint(e);
+                          return (
+                            <button
+                              key={e.id}
+                              onClick={() => scrollTo(id)}
+                              className={cn(
+                                "group flex w-full items-center gap-2 rounded-md py-1.5 pl-8 pr-3 text-left text-xs font-mono transition-colors",
+                                activeId === id
+                                  ? "bg-muted text-foreground"
+                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                              )}
+                            >
+                              <MethodBadge method={e.method} size="xs" />
+                              <span className="truncate">{e.path}</span>
+                            </button>
+                          );
+                        })}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ))}
+                </div>
+              </>
+            )}
           </nav>
         </aside>
 
-        <main className="space-y-32 pb-32 relative">
-          <div className="absolute inset-0 grid-bg opacity-5 pointer-events-none" />
-          
-          {sections.map((section) => (
-            <section key={section.id} id={section.id} className="scroll-mt-32 space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-px w-8 bg-white/20" />
-                  <h2 className="text-[10px] font-bold uppercase tracking-[0.4em] text-white/40">{section.label}</h2>
+        {/* Main content */}
+        <main className="min-w-0 max-w-4xl space-y-16">
+          {/* Header */}
+          <header className="space-y-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={spec.status} />
+              {spec.openapi_version && (
+                <Badge variant="outline" className="bg-muted/50 font-mono text-[10px] uppercase tracking-wider">
+                  OpenAPI {spec.openapi_version}
+                </Badge>
+              )}
+              {spec.api_version && (
+                <Badge variant="outline" className="bg-muted/50 font-mono text-[10px] uppercase tracking-wider">
+                  v{spec.api_version}
+                </Badge>
+              )}
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl">{spec.name}</h1>
+              {spec.description && (
+                <p className="text-xl leading-relaxed text-muted-foreground/90">
+                  {spec.description}
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 pt-4 sm:grid-cols-3 lg:grid-cols-4">
+              <MetaCard icon={Hash} label="Endpoints" value={String(spec.endpoint_count)} />
+              <MetaCard icon={Lock} label="Authentication" value={spec.auth_type || "None"} />
+              <MetaCard icon={Tag} label="API Version" value={spec.api_version || "—"} />
+              <MetaCard
+                icon={Globe}
+                label="OpenAPI"
+                value={spec.openapi_version || "—"}
+              />
+              <MetaCard 
+                icon={Calendar} 
+                label="Uploaded" 
+                value={spec.created_at ? format(new Date(spec.created_at), "MMM d, yyyy") : "—"} 
+              />
+              <MetaCard 
+                icon={Clock} 
+                label="Generated" 
+                value={doc?.updated_at ? format(new Date(doc.updated_at), "MMM d, yyyy") : "—"} 
+              />
+              <MetaCard
+                icon={Server}
+                label="Servers"
+                value={
+                  Array.isArray(spec.servers) && spec.servers.length > 0
+                    ? String(spec.servers.length)
+                    : "0"
+                }
+              />
+              <MetaCard icon={Shield} label="Status" value={spec.status} />
+            </div>
+
+            {Array.isArray(spec.servers) && spec.servers.length > 0 && (
+              <div className="rounded-xl border border-border/40 bg-muted/20 p-5">
+                <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">
+                  API Servers
                 </div>
-                
-                {section.id === "health-report" ? (
-                  <HealthReport report={spec.health_report} specId={spec.id} />
-                ) : section.content ? (
-                  <div className="prose prose-invert max-w-none prose-pre:bg-white/5 prose-pre:rounded-none prose-pre:border prose-pre:border-white/10 prose-headings:font-light prose-headings:tracking-tighter prose-h1:text-5xl prose-h2:text-3xl prose-p:text-white/60 prose-p:leading-relaxed prose-code:text-white prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-none prose-code:before:content-none prose-code:after:content-none">
-                    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
-                        {section.content}
-                      </ReactMarkdown>
-                    </Suspense>
-                  </div>
+                <div className="space-y-2 font-mono text-sm">
+                  {spec.servers.map((s: any, i: number) => (
+                    <div key={i} className="flex items-center gap-3 text-foreground/80">
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary/60" />
+                      <span className="select-all">
+                        {typeof s === "string" ? s : s.url || JSON.stringify(s)}
+                      </span>
+                      {typeof s === "object" && s?.description && (
+                        <span className="text-xs text-muted-foreground/60">— {s.description}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </header>
+
+          {/* Empty state — no doc yet */}
+          {!doc && <PendingDocs isFetching={isFetching} />}
+
+          {/* Doc sections */}
+          {doc &&
+            sections.map((s) => (
+              <section key={s.id} id={s.id} className="scroll-mt-32 space-y-6">
+                <div className="space-y-2">
+                  <h2 className="text-3xl font-bold tracking-tight text-foreground">{s.label}</h2>
+                  <Separator className="w-12 border-2 border-primary/20" />
+                </div>
+                {s.id === "health-report" ? (
+                  spec.health_report ? (
+                    <HealthReport report={spec.health_report} />
+                  ) : (
+                    <p className="text-sm italic text-muted-foreground">
+                      Health report is being generated...
+                    </p>
+                  )
+                ) : s.content ? (
+                  <Markdown content={s.content} />
                 ) : (
-                  <div className="h-32 border border-white/5 bg-white/[0.02] flex items-center justify-center italic text-white/20 text-sm">
-                    No intelligence data available for this sector.
-                  </div>
+                  <p className="text-sm italic text-muted-foreground">
+                    No {s.label.toLowerCase()} content available.
+                  </p>
                 )}
+              </section>
+            ))}
+
+          {/* Endpoints */}
+          {filteredEndpoints.length > 0 && (
+            <section className="scroll-mt-32 space-y-8">
+              <div className="space-y-2">
+                <h2 className="text-3xl font-bold tracking-tight text-foreground">
+                  {searchQuery ? "Search Results" : "Endpoints"}
+                </h2>
+                <Separator className="w-12 border-2 border-primary/20" />
+              </div>
+              <div className="space-y-6">
+                {filteredEndpoints.map((e: any) => (
+                  <EndpointCard key={e.id} endpoint={e} id={slugifyEndpoint(e)} />
+                ))}
               </div>
             </section>
-          ))}
+          )}
 
-          <div className="space-y-16">
-            <div className="flex items-center gap-3">
-              <div className="h-px w-8 bg-white/20" />
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.4em] text-white/40">Neural Routes</h2>
+          {searchQuery && filteredEndpoints.length === 0 && (
+            <div className="py-20 text-center">
+              <Search className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
+              <h3 className="text-lg font-medium text-foreground">No endpoints found</h3>
+              <p className="text-muted-foreground">Try adjusting your search query.</p>
             </div>
-            
-            <div className="space-y-24">
-              {endpoints.map((e: any) => (
-                <section key={e.id} id={slugifyEndpoint(e)} className="scroll-mt-32 group border border-white/10 bg-black p-10 hover:bg-white/[0.01] transition-all">
-                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-8 mb-10">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        <span className={cn(
-                          "text-[10px] font-bold px-3 py-1 uppercase tracking-widest",
-                          e.method === "GET" ? "text-blue-400 bg-blue-400/10 border border-blue-400/20" :
-                          e.method === "POST" ? "text-emerald-400 bg-emerald-400/10 border border-emerald-400/20" :
-                          e.method === "PUT" ? "text-amber-400 bg-amber-400/10 border border-amber-400/20" :
-                          "text-red-400 bg-red-400/10 border border-red-400/20"
-                        )}>
-                          {e.method}
-                        </span>
-                        <ConfidenceBadge provenance={e.provenance} />
-                      </div>
-                      <h3 className="text-3xl font-light tracking-tighter font-mono">{e.path}</h3>
-                      {e.summary && <p className="text-white/60 text-base leading-relaxed max-w-2xl italic">{e.summary}</p>}
-                    </div>
-                  </div>
-
-                  <div className="space-y-8">
-                    {e.description && (
-                      <div className="prose prose-invert max-w-none prose-p:text-sm prose-p:text-white/40">
-                        <ReactMarkdown>{e.description}</ReactMarkdown>
-                      </div>
-                    )}
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="space-y-4">
-                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/20">Parameters</h4>
-                        <div className="border border-white/5 bg-white/[0.02] p-6 text-xs text-white/40 italic">
-                          No input parameters required for this route.
-                        </div>
-                      </div>
-                      <div className="space-y-4">
-                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/20">Response</h4>
-                        <div className="border border-white/5 bg-[#0d1117] p-6 font-mono text-[11px] text-emerald-400/80">
-                          {"{\n  \"status\": \"success\",\n  \"data\": { ... }\n}"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              ))}
-            </div>
-          </div>
+          )}
         </main>
       </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="bg-black border-white/10 rounded-none max-w-sm">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white font-light tracking-tight text-xl">Decommission Intelligence Unit?</AlertDialogTitle>
-            <AlertDialogDescription className="text-white/40 text-xs leading-relaxed font-mono">
-              Permanently erase all neural mappings and AI context associated with this repository.
+            <AlertDialogTitle>Delete API Specification?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>This action cannot be undone.</p>
+              <p className="font-medium text-foreground">The following will be permanently deleted:</p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>Uploaded specification</li>
+                <li>Parsed endpoints</li>
+                <li>AI generated documentation</li>
+                <li>Dashboard entry</li>
+              </ul>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="mt-8 flex flex-col sm:flex-row gap-2">
-            <AlertDialogCancel className="rounded-none border-white/10 bg-transparent hover:bg-white/5 text-white/60">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleDelete(); }} className="rounded-none bg-red-600 text-white hover:bg-red-700 font-bold uppercase tracking-widest text-[10px]">Confirm Delete</AlertDialogAction>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Specification"
+              )}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -558,13 +685,242 @@ function DocsPage() {
   );
 }
 
+function SidebarLink({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex w-full items-center rounded-md px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+        active
+          ? "bg-muted font-medium text-foreground"
+          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function MetaCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: any;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-card p-3">
+      <div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" />
+        {label}
+      </div>
+      <div className="truncate text-sm font-semibold">{value}</div>
+    </div>
+  );
+}
+
+const METHOD_COLORS: Record<string, string> = {
+  GET: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  POST: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  PUT: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  PATCH: "bg-purple-500/15 text-purple-400 border-purple-500/30",
+  DELETE: "bg-red-500/15 text-red-400 border-red-500/30",
+  OPTIONS: "bg-slate-500/15 text-slate-400 border-slate-500/30",
+  HEAD: "bg-slate-500/15 text-slate-400 border-slate-500/30",
+};
+
+function MethodBadge({ method, size = "sm" }: { method: string; size?: "xs" | "sm" }) {
+  const m = method.toUpperCase();
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center rounded border font-mono font-bold uppercase",
+        METHOD_COLORS[m] ?? "bg-muted text-muted-foreground border-border",
+        size === "xs" ? "min-w-[44px] px-1.5 py-0.5 text-[10px]" : "min-w-[64px] px-2 py-1 text-xs",
+      )}
+    >
+      {m}
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    completed: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+    processing: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+    uploaded: "bg-slate-500/15 text-slate-400 border-slate-500/30",
+    failed: "bg-red-500/15 text-red-400 border-red-500/30",
+  };
+  return (
+    <Badge variant="outline" className={cn("capitalize", map[status] ?? "")}>
+      {status}
+    </Badge>
+  );
+}
+
+function EndpointCard({ endpoint, id }: { endpoint: Endpoint; id: string }) {
+  const copyPath = () => {
+    navigator.clipboard.writeText(endpoint.path);
+    toast.success("Endpoint path copied");
+  };
+
+  const copyMarkdown = () => {
+    const md = `### ${endpoint.method.toUpperCase()} ${endpoint.path}\n\n${endpoint.summary || ""}\n\n${endpoint.operation_id ? `**Operation ID:** \`${endpoint.operation_id}\`` : ""}`;
+    navigator.clipboard.writeText(md);
+    toast.success("Endpoint markdown copied");
+  };
+
+  return (
+    <Card id={id} className="scroll-mt-24 border-border/40 bg-card/50 backdrop-blur-sm transition-all hover:border-border/60 hover:shadow-md">
+      <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <MethodBadge method={endpoint.method} />
+          <code className="text-sm font-semibold tracking-tight text-foreground">{endpoint.path}</code>
+          {endpoint.provenance?.confidence && (
+            <ConfidenceBadge level={endpoint.provenance.confidence} className="ml-2" />
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyPath} title="Copy Path" aria-label="Copy endpoint path">
+            <Copy className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyMarkdown} title="Copy Markdown" aria-label="Copy endpoint markdown">
+            <FileJson className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      <div className="p-4">
+        <h3 className="mb-2 font-semibold text-foreground">{endpoint.summary || "No summary available"}</h3>
+        {endpoint.tags && endpoint.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {endpoint.tags.map((tag) => (
+              <Badge key={tag} variant="secondary" className="text-[10px] font-medium uppercase tracking-wider">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function Markdown({ content }: { content: string }) {
+  const [plugins, setPlugins] = useState<{ remark: any[]; rehype: any[] }>({ remark: [], rehype: [] });
+
+  useEffect(() => {
+    Promise.all([remarkGfm, rehypeHighlight]).then(([remark, rehype]) => {
+      setPlugins({ remark: [remark], rehype: [rehype] });
+      // Dynamically import CSS only when needed
+      import("highlight.js/styles/github-dark.css");
+    });
+  }, []);
+
+  return (
+    <div className="prose prose-sm prose-invert max-w-none">
+      <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+        <ReactMarkdown
+          remarkPlugins={plugins.remark}
+          rehypePlugins={plugins.rehype}
+          components={{
+            h1: ({ node, ...p }) => <h2 className="mt-8 mb-3 text-2xl font-bold tracking-tight" {...p} />,
+          h2: ({ node, ...p }) => <h3 className="mt-6 mb-2 text-xl font-semibold tracking-tight" {...p} />,
+          h3: ({ node, ...p }) => <h4 className="mt-5 mb-2 text-lg font-semibold" {...p} />,
+          p: ({ node, ...p }) => <p className="mb-4 leading-7 text-foreground/90" {...p} />,
+          ul: ({ node, ...p }) => <ul className="mb-4 ml-6 list-disc space-y-1 text-foreground/90" {...p} />,
+          ol: ({ node, ...p }) => <ol className="mb-4 ml-6 list-decimal space-y-1 text-foreground/90" {...p} />,
+          li: ({ node, ...p }) => <li className="leading-7" {...p} />,
+          a: ({ node, ...p }) => <a className="text-primary underline underline-offset-2 hover:no-underline" {...p} />,
+          blockquote: ({ node, ...p }) => (
+            <blockquote
+              className="my-4 border-l-4 border-primary/40 bg-muted/30 py-2 pl-4 italic text-muted-foreground"
+              {...p}
+            />
+          ),
+          pre: ({ node, children, ...p }) => {
+            const code = (children as any)?.props?.children || "";
+            const lang = (children as any)?.props?.className?.replace("language-", "") || "text";
+            
+            const copyCode = () => {
+              navigator.clipboard.writeText(code);
+              toast.success("Code copied to clipboard");
+            };
+
+            return (
+              <div className="group relative my-6">
+                <div className="absolute right-3 top-3 z-10 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Badge variant="secondary" className="bg-muted/80 text-[10px] uppercase backdrop-blur-sm">
+                    {lang}
+                  </Badge>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-7 w-7 bg-muted/80 backdrop-blur-sm"
+                    onClick={copyCode}
+                    aria-label="Copy code snippet"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <pre
+                  className="overflow-x-auto rounded-lg border border-border/60 bg-[#0d1117] p-4 text-sm scrollbar-thin scrollbar-thumb-border"
+                  {...p}
+                >
+                  {children}
+                </pre>
+              </div>
+            );
+          },
+          table: ({ node, ...p }) => (
+            <div className="my-4 overflow-x-auto rounded-lg border border-border/60">
+              <table className="w-full border-collapse text-sm" {...p} />
+            </div>
+          ),
+          thead: ({ node, ...p }) => <thead className="bg-muted/50" {...p} />,
+          th: ({ node, ...p }) => <th className="border-b border-border/60 px-4 py-2 text-left font-semibold" {...p} />,
+          td: ({ node, ...p }) => <td className="border-b border-border/40 px-4 py-2" {...p} />,
+          hr: () => <hr className="my-6 border-border/60" />,
+        }}
+      >
+        {content}
+        </ReactMarkdown>
+      </Suspense>
+    </div>
+  );
+}
+
 function LoadingState() {
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8 space-y-8">
-      <div className="h-12 w-12 border-2 border-white/10 border-t-white animate-spin" />
-      <div className="text-center space-y-2">
-        <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-white/40 animate-pulse">Initializing Neural Interface</p>
-        <p className="text-white/20 text-[9px] font-mono">Mapping repository pathways...</p>
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-8 w-full" />
+          ))}
+        </aside>
+        <main className="space-y-6">
+          <Skeleton className="h-10 w-2/3" />
+          <Skeleton className="h-6 w-full" />
+          <Skeleton className="h-6 w-3/4" />
+          <div className="grid grid-cols-4 gap-3 pt-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-16" />
+            ))}
+          </div>
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </main>
       </div>
     </div>
   );
@@ -572,22 +928,65 @@ function LoadingState() {
 
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8 text-center space-y-8">
-      <AlertTriangle className="h-16 w-16 text-red-500/40" />
-      <div className="space-y-4">
-        <h2 className="text-3xl font-light tracking-tighter">Signal Interrupted</h2>
-        <p className="text-white/40 text-sm max-w-md mx-auto font-mono">
-          We encountered a biological error while reconstructing this repository's intelligence.
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <Card className="max-w-md p-8 text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+          <AlertTriangle className="h-6 w-6 text-destructive" />
+        </div>
+        <h2 className="mb-2 text-xl font-semibold">Unable to load documentation</h2>
+        <p className="mb-6 text-sm text-muted-foreground">
+          Something went wrong while fetching this specification. Please try again.
         </p>
-      </div>
-      <Button variant="outline" onClick={onRetry} className="rounded-none border-white/10 hover:bg-white/5 text-[10px] font-bold uppercase tracking-widest h-12 px-8">
-        Retry Connection
-      </Button>
+        <div className="flex justify-center gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/dashboard">Back to Dashboard</Link>
+          </Button>
+          <Button onClick={onRetry}>Retry</Button>
+        </div>
+      </Card>
     </div>
   );
 }
 
-function buildFallbackMarkdown(doc: Doc | null, spec: Spec | null) {
-  if (!spec) return "";
-  return `# ${spec.name}\n\n${spec.description || "Intelligence unit active."}\n\n## Summary\n- Framework: ${spec.framework || "N/A"}\n- Language: ${spec.language || "N/A"}\n- Endpoints: ${spec.endpoint_count}`;
+function PendingDocs({ isFetching }: { isFetching: boolean }) {
+  return (
+    <Card className="border-dashed border-border/60 p-12 text-center">
+      <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+      <h3 className="mb-2 text-2xl font-semibold tracking-tight">
+        Documentation is still being generated
+      </h3>
+      <p className="mx-auto max-w-md text-muted-foreground">
+        Please wait while APIPilot AI analyses your specification. This page will refresh
+        automatically when your docs are ready.
+      </p>
+      {isFetching && (
+        <div className="mt-4 inline-flex items-center gap-2 text-xs text-muted-foreground">
+          <FileJson className="h-3.5 w-3.5" />
+          Checking for updates…
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function buildFallbackMarkdown(doc: Doc | null, spec?: Spec): string {
+  if (!doc || !spec) return "";
+  return [
+    `# ${spec.name}`,
+    spec.description ?? "",
+    "",
+    "## Overview",
+    doc.overview ?? "",
+    "",
+    "## Authentication",
+    doc.auth_guide ?? "",
+    "",
+    "## Quick Start",
+    doc.quick_start ?? "",
+    "",
+    "## Best Practices",
+    doc.best_practices ?? "",
+  ].join("\n");
 }
